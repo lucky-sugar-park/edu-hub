@@ -2,12 +2,10 @@ spring:
   config:
     import: optional:file:.env[.properties],optional:file:../.env[.properties]
   datasource:
-    url: jdbc:mariadb://localhost:3306/eduhub
+    url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
 
 logging:
   level:
     org.hibernate.SQL: debug
-
-server.port: 8085

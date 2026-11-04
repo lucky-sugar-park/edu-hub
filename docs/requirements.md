@@ -12,7 +12,7 @@
 
 \## 기술 스택
 
-\- 백엔드: Java 21, Spring Boot 3, Spring Data JPA, Flyway, springdoc-openapi, MariaDB
+\- 백엔드: Java 21, Spring Boot 3, Spring Data JPA, Flyway, springdoc-openapi, PostgreSQL
 
 \- 프론트엔드: React 18 + TypeScript, Module Federation(shell, course-mfe, enrollment-mfe), MUI, Axios
 
@@ -85,7 +85,6 @@
 | D-09 | 시작 후 대기자 | 교육 시작 후 남은 대기자는 대기 상태로 두고 승급 대상에서 제외한다 | FR-05, FR-07 |
 | D-10 | 수료 처리 | 수료 처리는 회차 종료 후에만 가능하다. 수료하지 못한 확정자는 확정 상태로 두며, 별도의 미수료 상태는 두지 않는다 | FR-07, FR-08 |
 | D-11 | 인증 방식 | Spring Security와 JWT 검증 구조로 시작하고, 개발 환경에서만 쓰는 로그인을 둔다. 사내 SSO는 나중에 연동한다 | NFR-03 |
-| D-12 | 성능 측정 기준 | 로컬 MariaDB, 데이터 1만 건에서 p95 300ms 이내를 기준으로 한다 | NFR-02 |
+| D-12 | 성능 측정 기준 | 로컬 Docker PostgreSQL, 데이터 1만 건에서 p95 300ms 이내를 기준으로 한다 | NFR-02 |
 | D-13 | CI·배포 환경 | CI는 GitHub Actions를 쓴다. 배포 대상은 확인이 필요하며, 정해질 때까지 Docker 이미지 빌드까지를 기준으로 한다 | NFR-05, NFR-06 |
-| D-14 | DB와 실행 환경 | Docker를 쓰지 않고 Windows에서 실행하며, DB는 로컬 MariaDB를 쓴다 | NFR-01, NFR-02, NFR-06 |
 

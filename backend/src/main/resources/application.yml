@@ -3,11 +3,8 @@ spring:
     name: eduhub
   jpa:
     open-in-view: false
-    properties:
-      hibernate.jdbc.time_zone: UTC
     hibernate:
       ddl-auto: validate
-  data:
-    web:
-      pageable:
-        max-page-size: 100
+  mvc:
+    problemdetails:
+      enabled: true
