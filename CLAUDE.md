@@ -10,7 +10,7 @@ EduHub는 사내 교육과정 조회-수강 신청 시스템이다.
 ## 디렉터리 지도
 
 - `backend/`: Spring Boot API 서버. 규칙은 `backend/CLAUDE.md`에 있다.
-- `frontend/`: React 화면. 아직 코드가 없고, 규칙은 `frontend/CLAUDE.md`에 있다.
+- `frontend/`: React 화면(npm workspaces). 규칙은 `frontend/CLAUDE.md`에 있다.
 - `docs/requirements.md`: 요구사항의 기준. FR/NFR 표와 "결정 사항"(D-xx)이 함께 규칙을 이룬다. 주차별 범위는 FR 표의 "주차" 열을 따른다.
 
 ## 실행 명령
