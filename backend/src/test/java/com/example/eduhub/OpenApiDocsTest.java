@@ -25,4 +25,14 @@ class OpenApiDocsTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.paths['/api/health'].get").exists());
   }
+
+  @Test
+  void apiDocsIncludeCourseEndpoints() throws Exception {
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/api/v1/courses'].get.summary").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/courses/{id}'].get.summary").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/courses/{id}'].get.responses['404']").exists());
+  }
 }
