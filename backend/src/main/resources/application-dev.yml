@@ -2,7 +2,7 @@ spring:
   config:
     import: optional:file:.env[.properties],optional:file:../.env[.properties]
   datasource:
-    url: ${DB_URL}
+    url: jdbc:mariadb://localhost:3306/eduhub
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
 
