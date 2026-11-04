@@ -22,9 +22,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.flywaydb:flyway-core")
-    implementation("org.flywaydb:flyway-database-postgresql")
+    implementation("org.flywaydb:flyway-mysql")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17")
-    runtimeOnly("org.postgresql:postgresql")
+    runtimeOnly("org.mariadb.jdbc:mariadb-java-client")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

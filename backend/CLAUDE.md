@@ -5,7 +5,7 @@
 `backend/`에서 실행한다.
 
 ```bash
-./gradlew test                                  # 전체 테스트 (DB 불필요)
+./gradlew test                                  # 전체 테스트 (로컬 MariaDB 필요)
 ./gradlew test --tests "*HealthControllerTest"  # 테스트 하나만 실행
 ./gradlew spotlessApply                         # 포맷 적용
 ./gradlew check                                 # 테스트 + 포맷 검사
@@ -29,17 +29,18 @@
 
 - 모든 API는 OpenAPI 문서가 있어야 하고, 프론트 클라이언트는 이 스펙에서 생성한다(NFR-04).
 - 문서는 springdoc 기본 경로인 `/v3/api-docs`와 `/swagger-ui.html`에서 제공된다.
-- 에러 응답은 ProblemDetail 형식이다.
+- 에러 응답은 `common/ErrorResponse`(`code`, `message`) 형식이며, `common/GlobalExceptionHandler`에서 처리한다.
 
 ## 프로필과 환경 변수
 
-- `dev`: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 읽는다. 환경 변수 또는 `.env`(`backend/`나 저장소 루트)로 지정하며, 이름은 `.env.example`에 있다.
-- `test`: DataSource, JPA, Flyway 자동 구성을 제외해 DB 없이 실행한다. 그래서 테스트 클래스에 `@ActiveProfiles("test")`를 붙여야 한다. 엔티티와 리포지토리를 추가하면 이 방식으로는 부족하므로 테스트 DB 구성을 함께 정해야 한다.
+- `dev`: 로컬 MariaDB의 `eduhub` 스키마에 접속한다. `DB_USERNAME`, `DB_PASSWORD`는 환경 변수 또는 `.env`(`backend/`나 저장소 루트)로 지정하며, 이름은 `.env.example`에 있다.
+- `test`: 같은 계정으로 로컬 MariaDB의 `eduhub_test` 스키마에 접속한다. DB가 필요한 테스트는 `@ActiveProfiles("test")`를 붙이고, `@DataJpaTest`에는 `@AutoConfigureTestDatabase(replace = NONE)`도 붙인다.
+- `eduhub`와 `eduhub_test` 스키마는 미리 만들어 두어야 한다.
 
 ## 구현 시 유의할 점
 
-- 동시성 테스트(NFR-01)는 락과 인덱스 동작을 확인해야 하므로 H2가 아닌 실제 PostgreSQL에서 돌린다.
-- 취소 후 재신청이 가능하므로(D-05), 중복 신청 방지에 `회차+사용자` 일반 유니크 제약을 쓸 수 없다.
+- 동시성 테스트(NFR-01)는 락과 인덱스 동작을 확인해야 하므로 H2가 아닌 실제 MariaDB에서 돌린다.
+- 취소 후 재신청이 가능하므로(D-05), 중복 신청 방지에 `회차+사용자` 일반 유니크 제약을 쓸 수 없다. MariaDB에는 부분 인덱스도 없으므로 다른 방법이 필요하다.
 - 정원 감소 시 대기로 바뀐 사람은 기존 대기자보다 앞 순번이 된다(D-03). 대기 순서를 설계할 때 이를 고려한다.
 - 락 방식과 대기 순서 표현 방식은 아직 정해지지 않았다. 구현 전에 `docs/requirements.md`의 "결정 사항"에 기록한다.
 

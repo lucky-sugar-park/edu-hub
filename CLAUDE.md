@@ -18,8 +18,8 @@ EduHub는 사내 교육과정 조회-수강 신청 시스템이다.
 `backend/`에서 실행한다.
 
 ```bash
-./gradlew test    # 테스트 (DB 불필요)
-./gradlew bootRun # dev 프로필로 실행 (PostgreSQL 필요)
+./gradlew test    # 테스트 (로컬 MariaDB 필요)
+./gradlew bootRun # dev 프로필로 실행 (로컬 MariaDB 필요)
 ```
 
 ## 공통 규칙
