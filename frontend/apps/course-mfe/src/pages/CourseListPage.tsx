@@ -4,6 +4,7 @@ import {
   Button,
   CircularProgress,
   Container,
+  Link,
   MenuItem,
   Paper,
   Stack,
@@ -18,10 +19,10 @@ import {
   Typography,
 } from "@mui/material";
 import { type FormEvent, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import { CATEGORIES } from "../categories";
 import { useCourses } from "../hooks/useCourses";
-
-const STATUS_LABELS: Record<string, string> = { OPEN: "운영 중", CLOSED: "종료" };
+import { statusLabel } from "../statusLabels";
 
 export function CourseListPage() {
   const [keywordInput, setKeywordInput] = useState("");
@@ -108,9 +109,13 @@ export function CourseListPage() {
               <TableBody>
                 {courses.map((course) => (
                   <TableRow key={course.id}>
-                    <TableCell>{course.title}</TableCell>
+                    <TableCell>
+                      <Link component={RouterLink} to={`/courses/${course.id}`}>
+                        {course.title}
+                      </Link>
+                    </TableCell>
                     <TableCell>{course.category}</TableCell>
-                    <TableCell>{STATUS_LABELS[course.status ?? ""] ?? course.status}</TableCell>
+                    <TableCell>{statusLabel(course.status)}</TableCell>
                   </TableRow>
                 ))}
                 {courses.length === 0 && (

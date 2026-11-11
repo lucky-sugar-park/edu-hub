@@ -1,11 +1,14 @@
 import { CssBaseline } from "@mui/material";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { CourseListPage } from "./pages/CourseListPage";
+import { BrowserRouter } from "react-router-dom";
+import { App } from "./App";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <CssBaseline />
-    <CourseListPage />
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </StrictMode>,
 );

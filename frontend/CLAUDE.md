@@ -3,6 +3,9 @@
 - UI는 MUI로 만든다.
 - API 호출은 OpenAPI 스펙에서 생성한 Axios 클라이언트로만 한다(NFR-04).
 - `CourseApi` 인스턴스는 `apps/course-mfe/src/api/courseApi.ts` 한 곳에서만 만들고, 화면은 커스텀 훅을 통해서만 API를 쓴다.
+- 화면 이동은 `react-router-dom`으로 한다. 경로는 `apps/course-mfe/src/App.tsx`에 모은다(`/` 목록, `/courses/:id` 상세). 라우터를 쓰는 화면의 테스트는 `MemoryRouter`로 감싼다.
+- 날짜·시간은 `apps/course-mfe/src/format.ts`의 `formatDateTime`으로 보여 준다. API의 UTC 값을 PC 시간대와 상관없이 한국 시간(Asia/Seoul)으로 바꾼다.
+- 404를 따로 보여 줘야 하면 훅에서 전용 에러(예: `CourseNotFoundError`)로 바꿔 돌려준다. 화면은 axios를 직접 알지 않는다.
 
 ## 명령
 
