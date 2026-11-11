@@ -19,6 +19,7 @@ it("목록을 표에 보여 준다", () => {
     },
     loading: false,
     error: null,
+    reload: vi.fn(),
   });
 
   render(<CourseListPage />);
@@ -34,6 +35,7 @@ it("실패하면 에러 메시지를 보여 준다", () => {
     data: null,
     loading: false,
     error: new Error("서버 오류"),
+    reload: vi.fn(),
   });
 
   render(<CourseListPage />);

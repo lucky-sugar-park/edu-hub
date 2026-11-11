@@ -1,5 +1,5 @@
 import type { PageResponseCourseSummaryResponse } from "@eduhub/api-client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { courseApi } from "../api/courseApi";
 
 export interface UseCoursesParams {
@@ -14,12 +14,16 @@ export interface UseCoursesResult {
   data: PageResponseCourseSummaryResponse | null;
   loading: boolean;
   error: Error | null;
+  /** 같은 조건으로 다시 불러온다. 관리 화면에서 등록·수정 뒤에 쓴다. */
+  reload: () => void;
 }
 
 export function useCourses({ keyword, category, page, size }: UseCoursesParams): UseCoursesResult {
   const [data, setData] = useState<PageResponseCourseSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = useCallback(() => setReloadKey((key) => key + 1), []);
 
   useEffect(() => {
     // 조건이 바뀐 뒤 늦게 도착한 이전 응답은 무시한다.
@@ -42,7 +46,7 @@ export function useCourses({ keyword, category, page, size }: UseCoursesParams):
     return () => {
       ignore = true;
     };
-  }, [keyword, category, page, size]);
+  }, [keyword, category, page, size, reloadKey]);
 
-  return { data, loading, error };
+  return { data, loading, error, reload };
 }
