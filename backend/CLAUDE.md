@@ -9,13 +9,18 @@
 ./gradlew test --tests "*HealthControllerTest"  # 테스트 하나만 실행
 ./gradlew spotlessApply                         # 포맷 적용
 ./gradlew check                                 # 테스트 + 포맷 검사
+./gradlew bootRun --args="--spring.profiles.active=dev --server.port=8088"  # 다른 포트로 실행
 ```
+
+`--args`는 `build.gradle.kts`의 기본 인자(`--spring.profiles.active=dev`)를 대체하므로 프로필도 함께 적는다.
 
 `test`에는 포맷 검사가 포함되지 않으므로, 작업을 마칠 때는 `check`를 실행한다.
 
 ## 계층 규칙
 
 - Controller → Service → Repository 순서로 호출한다. Controller에서 Repository를 직접 호출하지 않는다.
+- 조회 서비스(`CourseQueryService`, readOnly)와 쓰기 서비스(`CourseCommandService`)를 나눈다. 관리자 쓰기 API는 `/api/v1/admin` 아래(`CourseAdminController`)에 둔다(D-18).
+- 상태 규칙(종료 여부, 시작 여부)은 엔티티 메서드에서 검사한다. 현재 시각은 `Clock` 빈(`common/ClockConfig`)으로 받아 테스트에서 고정한다.
 - 패키지는 `com.example.eduhub` 아래 도메인별로 나눈다. `course`는 과정과 회차, `enrollment`는 신청·대기·취소·승급·수료, `common`은 공통 코드를 담는다(NFR-07).
 
 ## JPA 규칙
@@ -30,6 +35,9 @@
 - 모든 API는 OpenAPI 문서가 있어야 하고, 프론트 클라이언트는 이 스펙에서 생성한다(NFR-04).
 - 문서는 springdoc 기본 경로인 `/v3/api-docs`와 `/swagger-ui.html`에서 제공된다.
 - 에러 응답은 `common/ErrorResponse`(`code`, `message`) 형식이며, `common/GlobalExceptionHandler`에서 처리한다.
+  - 404: `NotFoundException` 하위 클래스, code `NOT_FOUND`.
+  - 400: 요청 본문 검증 실패는 code `BAD_REQUEST`, message `필드: 메시지, ...`(필드 이름 순). Bean Validation 메시지는 한국어로 직접 적는다. 그 밖의 입력 오류는 `InvalidRequestException`.
+  - 409: `ConflictException(code, message)`. code는 `COURSE_CLOSED`, `SESSION_CLOSED`, `SESSION_STARTED`, `SESSION_NOT_STARTED`처럼 상황별로 둔다.
 
 ## 프로필과 환경 변수
 
