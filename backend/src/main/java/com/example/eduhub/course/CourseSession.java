@@ -1,5 +1,7 @@
 package com.example.eduhub.course;
 
+import com.example.eduhub.common.ConflictException;
+import com.example.eduhub.common.InvalidRequestException;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -44,8 +46,43 @@ public class CourseSession {
     this.status = CourseSessionStatus.OPEN;
   }
 
-  public void close() {
+  /** 교육 시작 시각이 지났으면(같은 시각 포함) 시작한 것으로 본다. */
+  public boolean hasStarted(Instant now) {
+    return !now.isBefore(startAt);
+  }
+
+  /**
+   * 회차를 수정한다. 교육 시작 후에는 정원과 시작 시각을 바꿀 수 없고 장소만 바꿀 수 있다(D-08, D-17).
+   *
+   * <p>정원 변경에 따른 대기자 승급(D-02)과 확정자 강등(D-03)은 수강 신청 기능(3주차)에서 이 변경 뒤에 이어 처리한다.
+   */
+  public void update(Instant startAt, String place, int capacity, Instant now) {
+    ensureOpen();
+    if (hasStarted(now)) {
+      if (!this.startAt.equals(startAt) || this.capacity != capacity) {
+        throw new ConflictException("SESSION_STARTED", "교육이 시작된 회차는 정원과 시작 시각을 바꿀 수 없습니다: " + id);
+      }
+    } else if (startAt.isBefore(now)) {
+      throw new InvalidRequestException("startAt: 현재 이후 시각이어야 합니다");
+    }
+    this.startAt = startAt;
+    this.place = place;
+    this.capacity = capacity;
+  }
+
+  /** 회차를 종료한다. 회차 종료는 교육 완료를 뜻하므로 교육 시작 후에만 할 수 있다(D-04, D-16). */
+  public void close(Instant now) {
+    ensureOpen();
+    if (!hasStarted(now)) {
+      throw new ConflictException("SESSION_NOT_STARTED", "아직 시작하지 않은 회차는 종료할 수 없습니다: " + id);
+    }
     this.status = CourseSessionStatus.CLOSED;
+  }
+
+  private void ensureOpen() {
+    if (status == CourseSessionStatus.CLOSED) {
+      throw new ConflictException("SESSION_CLOSED", "종료된 회차입니다: " + id);
+    }
   }
 
   public Long getId() {

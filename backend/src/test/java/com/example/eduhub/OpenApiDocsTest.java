@@ -35,4 +35,23 @@ class OpenApiDocsTest {
         .andExpect(jsonPath("$.paths['/api/v1/courses/{id}'].get.summary").exists())
         .andExpect(jsonPath("$.paths['/api/v1/courses/{id}'].get.responses['404']").exists());
   }
+
+  @Test
+  void apiDocsIncludeCourseAdminEndpoints() throws Exception {
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/api/v1/admin/courses'].post.tags[0]").value("CourseAdmin"))
+        .andExpect(jsonPath("$.paths['/api/v1/admin/courses'].post.responses['400']").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/admin/courses/{courseId}'].put.responses['409']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/admin/courses/{courseId}/close'].post").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/admin/courses/{courseId}/sessions'].post").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/admin/sessions/{sessionId}'].put.responses['409']").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/admin/sessions/{sessionId}/close'].post.responses['409']")
+                .exists())
+        .andExpect(jsonPath("$.components.schemas.SessionRequest.required").isArray());
+  }
 }

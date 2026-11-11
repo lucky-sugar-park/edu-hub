@@ -153,6 +153,38 @@ class CourseRepositoryTest {
     assertThat(sessions).extracting(CourseSession::getStartAt).containsExactly(earlier, later);
   }
 
+  @Test
+  void persistsCourseAndSessionChanges() {
+    Instant now = Instant.parse("2026-11-12T00:00:00Z");
+    Instant startAt = Instant.parse("2026-12-01T01:00:00Z");
+    Course course = saveCourse("JPA 입문", "개발");
+    CourseSession session =
+        entityManager.persistAndFlush(new CourseSession(course, startAt, "본사 3층", 20));
+
+    course.update("JPA 심화", "개발", "심화 과정");
+    course.close();
+    session.update(startAt.plusSeconds(3600), "별관", 30, now);
+    entityManager.flush();
+    entityManager.clear();
+
+    Course foundCourse = courseRepository.findById(course.getId()).orElseThrow();
+    assertThat(foundCourse.getTitle()).isEqualTo("JPA 심화");
+    assertThat(foundCourse.getDescription()).isEqualTo("심화 과정");
+    assertThat(foundCourse.getStatus()).isEqualTo(CourseStatus.CLOSED);
+    CourseSession foundSession = courseSessionRepository.findById(session.getId()).orElseThrow();
+    assertThat(foundSession.getStartAt()).isEqualTo(startAt.plusSeconds(3600));
+    assertThat(foundSession.getPlace()).isEqualTo("별관");
+    assertThat(foundSession.getCapacity()).isEqualTo(30);
+    assertThat(foundSession.getStatus()).isEqualTo(CourseSessionStatus.OPEN);
+
+    foundSession.close(startAt.plusSeconds(7200));
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(courseSessionRepository.findById(session.getId()).orElseThrow().getStatus())
+        .isEqualTo(CourseSessionStatus.CLOSED);
+  }
+
   private Course saveCourse(String title, String category) {
     return courseRepository.saveAndFlush(new Course(title, category, null));
   }
