@@ -315,6 +315,68 @@ class EnrollmentRepositoryTest {
         .isEmpty();
   }
 
+  @Test
+  void findsWaitingByKeyAscendingIncludingNegativeKeysWithPageSize() {
+    Course course = saveCourse();
+    CourseSession session = saveSession(course, 10);
+    CourseSession other = saveSession(course, 10);
+    Enrollment k5 =
+        enrollmentRepository.saveAndFlush(Enrollment.waiting(session, "E1", APPLIED_AT, 5L));
+    Enrollment kNeg2 =
+        enrollmentRepository.saveAndFlush(Enrollment.waiting(session, "E2", APPLIED_AT, -2L));
+    Enrollment k1 =
+        enrollmentRepository.saveAndFlush(Enrollment.waiting(session, "E3", APPLIED_AT, 1L));
+    enrollmentRepository.saveAndFlush(Enrollment.confirmed(session, "E4", APPLIED_AT));
+    enrollmentRepository.saveAndFlush(Enrollment.waiting(other, "E5", APPLIED_AT, -9L));
+
+    var all =
+        enrollmentRepository.findBySessionIdAndStatusOrderByWaitingKeyAsc(
+            session.getId(), EnrollmentStatus.WAITING, PageRequest.of(0, 10));
+    var top2 =
+        enrollmentRepository.findBySessionIdAndStatusOrderByWaitingKeyAsc(
+            session.getId(), EnrollmentStatus.WAITING, PageRequest.of(0, 2));
+
+    assertThat(all)
+        .extracting(Enrollment::getId)
+        .containsExactly(kNeg2.getId(), k1.getId(), k5.getId());
+    assertThat(top2).extracting(Enrollment::getId).containsExactly(kNeg2.getId(), k1.getId());
+  }
+
+  @Test
+  void allowsReEnrollmentAfterRealCancel() {
+    CourseSession session = saveSession(saveCourse(), 10);
+    Enrollment first =
+        enrollmentRepository.saveAndFlush(Enrollment.confirmed(session, EMPLOYEE, APPLIED_AT));
+    first.cancel(APPLIED_AT.plusSeconds(60));
+    enrollmentRepository.saveAndFlush(first);
+
+    Enrollment second =
+        enrollmentRepository.saveAndFlush(Enrollment.confirmed(session, EMPLOYEE, APPLIED_AT));
+
+    assertThat(second.getId()).isNotNull().isNotEqualTo(first.getId());
+    assertThat(first.getStatus()).isEqualTo(EnrollmentStatus.CANCELLED);
+  }
+
+  @Test
+  void cancelledWaitingRowDoesNotConflictOnWaitingKeyIndex() {
+    CourseSession session = saveSession(saveCourse(), 10);
+    Enrollment waiting =
+        enrollmentRepository.saveAndFlush(Enrollment.waiting(session, EMPLOYEE, APPLIED_AT, 1L));
+    waiting.cancel(APPLIED_AT.plusSeconds(60));
+    enrollmentRepository.saveAndFlush(waiting);
+
+    Enrollment sameKey =
+        enrollmentRepository.saveAndFlush(Enrollment.waiting(session, "E2", APPLIED_AT, 1L));
+    Enrollment secondCancelled =
+        enrollmentRepository.saveAndFlush(Enrollment.waiting(session, "E3", APPLIED_AT, 2L));
+    secondCancelled.cancel(APPLIED_AT.plusSeconds(61));
+    enrollmentRepository.saveAndFlush(secondCancelled);
+
+    assertThat(sameKey.getId()).isNotNull();
+    assertThat(waiting.getWaitingKey()).isNull();
+    assertThat(secondCancelled.getWaitingKey()).isNull();
+  }
+
   private final AtomicLong nextWaitingKey = new AtomicLong(1);
 
   private Enrollment enrollment(CourseSession session, String employeeId, EnrollmentStatus status) {

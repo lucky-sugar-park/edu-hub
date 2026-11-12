@@ -39,6 +39,9 @@ public class Enrollment {
   /** 확정 시각. 정원 감소 시 가장 늦게 확정된 사람부터 강등하는 기준이다(D-03). */
   private Instant confirmedAt;
 
+  /** 취소 시각. CANCELLED일 때만 값이 있다(D-25). */
+  private Instant cancelledAt;
+
   protected Enrollment() {}
 
   private Enrollment(
@@ -75,6 +78,26 @@ public class Enrollment {
     this.waitingKey = waitingKey;
   }
 
+  /** 신청을 취소한다. 확정 시각은 기록으로 남긴다(D-25). */
+  public void cancel(Instant now) {
+    if (status != EnrollmentStatus.CONFIRMED && status != EnrollmentStatus.WAITING) {
+      throw new IllegalStateException("확정 또는 대기 상태만 취소할 수 있습니다: " + status);
+    }
+    this.status = EnrollmentStatus.CANCELLED;
+    this.cancelledAt = now;
+    this.waitingKey = null;
+  }
+
+  /** 빈자리가 생겨 대기에서 확정으로 올린다(D-26). */
+  public void promote(Instant now) {
+    if (status != EnrollmentStatus.WAITING) {
+      throw new IllegalStateException("대기 상태만 승급할 수 있습니다: " + status);
+    }
+    this.status = EnrollmentStatus.CONFIRMED;
+    this.confirmedAt = now;
+    this.waitingKey = null;
+  }
+
   public Long getId() {
     return id;
   }
@@ -101,5 +124,9 @@ public class Enrollment {
 
   public Instant getConfirmedAt() {
     return confirmedAt;
+  }
+
+  public Instant getCancelledAt() {
+    return cancelledAt;
   }
 }

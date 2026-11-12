@@ -54,7 +54,7 @@ public class CourseSession {
   /**
    * 회차를 수정한다. 교육 시작 후에는 정원과 시작 시각을 바꿀 수 없고 장소만 바꿀 수 있다(D-08, D-17).
    *
-   * <p>정원 변경에 따른 대기자 승급(D-02)과 확정자 강등(D-03)은 수강 신청 기능(3주차)에서 이 변경 뒤에 이어 처리한다.
+   * <p>정원 변경에 따른 대기자 승급(D-02)과 확정자 강등(D-03)은 같은 트랜잭션에서 {@code SessionCapacityChangeHandler}가 처리한다.
    */
   public void update(Instant startAt, String place, int capacity, Instant now) {
     ensureOpen();
@@ -84,6 +84,17 @@ public class CourseSession {
     ensureOpen();
     if (hasStarted(now)) {
       throw new ConflictException("SESSION_STARTED", "교육이 시작된 회차에는 신청할 수 없습니다: " + id);
+    }
+  }
+
+  /**
+   * 취소 가능한 회차인지 검사한다. 교육이 시작하면 확정·대기 모두 취소할 수 없다(D-07). 검사 순서는 {@link #ensureEnrollable}과 같다(종료 →
+   * 시작).
+   */
+  public void ensureCancellable(Instant now) {
+    ensureOpen();
+    if (hasStarted(now)) {
+      throw new ConflictException("SESSION_STARTED", "교육이 시작된 회차의 신청은 취소할 수 없습니다: " + id);
     }
   }
 

@@ -40,7 +40,11 @@ class EnrollmentQueryServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new EnrollmentQueryService(courseSessionRepository, enrollmentRepository);
+    service =
+        new EnrollmentQueryService(
+            courseSessionRepository,
+            enrollmentRepository,
+            new WaitingNumbers(enrollmentRepository));
     session = new CourseSession(new Course("JPA 입문", "개발", null), NOW.plusSeconds(3600), "강의실", 5);
     ReflectionTestUtils.setField(session, "id", SESSION_ID);
   }

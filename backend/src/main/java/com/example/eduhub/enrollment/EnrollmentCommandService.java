@@ -5,9 +5,7 @@ import com.example.eduhub.course.CourseSessionRepository;
 import com.example.eduhub.course.SessionNotFoundException;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.EnumSet;
 import java.util.Locale;
-import java.util.Set;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -17,20 +15,24 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class EnrollmentCommandService {
 
-  private static final Set<EnrollmentStatus> ACTIVE =
-      EnumSet.of(EnrollmentStatus.CONFIRMED, EnrollmentStatus.WAITING);
   private static final String ACTIVE_UNIQUE_CONSTRAINT = "uk_enrollment_active";
 
   private final CourseSessionRepository courseSessionRepository;
   private final EnrollmentRepository enrollmentRepository;
+  private final WaitingNumbers waitingNumbers;
+  private final VacancyFiller vacancyFiller;
   private final Clock clock;
 
   public EnrollmentCommandService(
       CourseSessionRepository courseSessionRepository,
       EnrollmentRepository enrollmentRepository,
+      WaitingNumbers waitingNumbers,
+      VacancyFiller vacancyFiller,
       Clock clock) {
     this.courseSessionRepository = courseSessionRepository;
     this.enrollmentRepository = enrollmentRepository;
+    this.waitingNumbers = waitingNumbers;
+    this.vacancyFiller = vacancyFiller;
     this.clock = clock;
   }
 
@@ -49,7 +51,7 @@ public class EnrollmentCommandService {
     session.ensureEnrollable(now);
     session.getCourse().ensureOpen();
     if (enrollmentRepository.existsBySessionIdAndEmployeeIdAndStatusIn(
-        sessionId, employeeId, ACTIVE)) {
+        sessionId, employeeId, WaitingNumbers.ACTIVE)) {
       throw new DuplicateEnrollmentException(sessionId);
     }
     long confirmed =
@@ -66,18 +68,34 @@ public class EnrollmentCommandService {
       enrollment = Enrollment.waiting(session, employeeId, now, waitingKey);
     }
     Enrollment saved = save(enrollment, sessionId);
-    return EnrollmentResponse.of(saved, waitingNumberOf(saved, sessionId));
+    return EnrollmentResponse.of(saved, waitingNumbers.numberOf(saved));
   }
 
-  /** 회차 락 안에서 계산한다. 순번 = 나보다 앞선 대기자 수 + 1. 확정이면 null. */
-  private Integer waitingNumberOf(Enrollment saved, Long sessionId) {
-    if (saved.getStatus() != EnrollmentStatus.WAITING) {
-      return null;
+  /**
+   * 내 활성 신청을 취소한다(FR-06). 확정자가 취소하면 같은 트랜잭션에서 대기 1순위를 승급시킨다(D-01).
+   *
+   * <p>회차 락 조회가 첫 쿼리이다. 과정이 종료되어도 취소할 수 있으므로 과정 종료는 검사하지 않는다(D-25).
+   */
+  @Transactional(isolation = Isolation.READ_COMMITTED)
+  public EnrollmentResponse cancel(Long sessionId, String employeeId) {
+    CourseSession session =
+        courseSessionRepository
+            .findByIdForUpdate(sessionId)
+            .orElseThrow(() -> new SessionNotFoundException(sessionId));
+    Instant now = clock.instant();
+    session.ensureCancellable(now);
+    Enrollment enrollment =
+        enrollmentRepository
+            .findBySessionIdAndEmployeeIdAndStatusIn(sessionId, employeeId, WaitingNumbers.ACTIVE)
+            .orElseThrow(() -> new EnrollmentNotFoundException(sessionId));
+    boolean wasConfirmed = enrollment.getStatus() == EnrollmentStatus.CONFIRMED;
+    enrollment.cancel(now);
+    enrollmentRepository.saveAndFlush(enrollment);
+    if (wasConfirmed) {
+      vacancyFiller.fillVacancies(session, now);
     }
-    long ahead =
-        enrollmentRepository.countBySessionIdAndStatusAndWaitingKeyLessThan(
-            sessionId, EnrollmentStatus.WAITING, saved.getWaitingKey());
-    return Math.toIntExact(ahead + 1);
+    // TODO(FR-09): 승급 알림
+    return EnrollmentResponse.of(enrollment, null);
   }
 
   private Enrollment save(Enrollment enrollment, Long sessionId) {

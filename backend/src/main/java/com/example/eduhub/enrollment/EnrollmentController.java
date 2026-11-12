@@ -98,4 +98,34 @@ public class EnrollmentController {
           String employeeId) {
     return enrollmentQueryService.getMyEnrollment(sessionId, employeeId);
   }
+
+  // TODO(NFR-03): 인증 도입 후 로그인 사용자에서 사번을 꺼내고 헤더를 없앤다
+  @Operation(summary = "회차의 내 신청을 취소한다", description = "교육 시작 전까지만. 확정자가 취소하면 대기 1순위가 확정된다")
+  @ApiResponse(responseCode = "200", description = "취소된 신청(status=CANCELLED)")
+  @ApiResponse(
+      responseCode = "400",
+      description = "사번 헤더 누락·공백·20자 초과, 또는 회차 id가 숫자가 아님",
+      content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description = "회차가 없거나, 그 회차에 내 활성 신청이 없음",
+      content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "교육 시작 후(SESSION_STARTED), 종료된 회차(SESSION_CLOSED)",
+      content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  @ApiResponse(
+      responseCode = "503",
+      description = "회차 락 대기 시간 초과(LOCK_TIMEOUT). 잠시 후 다시 시도할 수 있다",
+      content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  @PostMapping("/api/v1/sessions/{sessionId}/enrollments/me/cancel")
+  public EnrollmentResponse cancel(
+      @PathVariable Long sessionId,
+      @Parameter(description = "신청자 사번. 인증 도입 전 임시")
+          @RequestHeader("X-Employee-Id")
+          @NotBlank
+          @Size(max = 20)
+          String employeeId) {
+    return enrollmentCommandService.cancel(sessionId, employeeId);
+  }
 }
