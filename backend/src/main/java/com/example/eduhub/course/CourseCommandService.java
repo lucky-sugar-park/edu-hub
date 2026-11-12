@@ -76,7 +76,7 @@ public class CourseCommandService {
     session.update(request.startAt(), request.place(), request.capacity(), now());
     int newCapacity = session.getCapacity();
     if (newCapacity != oldCapacity) {
-      // 감소 시 강등(D-03)은 핸들러가 처리한다. D-02 승급은 FR-06.
+      // 감소 시 강등(D-03)과 증가 시 승급(D-02)을 모두 핸들러가 처리한다.
       capacityChangeHandler.onCapacityChanged(session, oldCapacity, newCapacity);
     }
     return toSessionResponse(session);

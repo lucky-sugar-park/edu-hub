@@ -10,7 +10,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.example.eduhub.course.Course;
 import com.example.eduhub.course.CourseSession;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,14 +31,19 @@ class CapacityChangeEnrollmentHandlerTest {
   private static final Long SESSION_ID = 3L;
   private static final Instant T1 = Instant.parse("2026-11-12T01:00:00Z");
 
+  private static final Instant NOW = Instant.parse("2026-11-12T05:00:00Z");
+
   @Mock private EnrollmentRepository enrollmentRepository;
+  @Mock private VacancyFiller vacancyFiller;
 
   private CapacityChangeEnrollmentHandler handler;
   private CourseSession session;
 
   @BeforeEach
   void setUp() {
-    handler = new CapacityChangeEnrollmentHandler(enrollmentRepository);
+    handler =
+        new CapacityChangeEnrollmentHandler(
+            enrollmentRepository, vacancyFiller, Clock.fixed(NOW, ZoneOffset.UTC));
     session =
         new CourseSession(
             new Course("JPA 입문", "개발", null), Instant.parse("2027-01-01T00:00:00Z"), "본사", 5);
@@ -106,10 +113,39 @@ class CapacityChangeEnrollmentHandlerTest {
 
   /** D5 */
   @Test
-  void doesNothingOnCapacityIncrease() {
+  void doesNotTouchRepositoryOnCapacityIncrease() {
     handler.onCapacityChanged(session, 3, 5);
 
     verifyNoInteractions(enrollmentRepository);
+  }
+
+  /** P1 */
+  @Test
+  void fillsVacanciesWithCurrentTimeOnCapacityIncrease() {
+    handler.onCapacityChanged(session, 5, 7);
+
+    verify(vacancyFiller).fillVacancies(session, NOW);
+    verifyNoInteractions(enrollmentRepository);
+  }
+
+  /** P2: 증가분이 대기자보다 많아도 호출하고, 실제 승급 수는 VacancyFiller가 정한다. */
+  @Test
+  void callsFillerEvenWhenIncreaseExceedsWaiters() {
+    given(vacancyFiller.fillVacancies(session, NOW)).willReturn(1);
+
+    handler.onCapacityChanged(session, 5, 10);
+
+    verify(vacancyFiller).fillVacancies(session, NOW);
+  }
+
+  @Test
+  void doesNotFillOnDecreaseOrSameCapacity() {
+    givenConfirmedCount(3);
+
+    handler.onCapacityChanged(session, 5, 3);
+    handler.onCapacityChanged(session, 5, 5);
+
+    verifyNoInteractions(vacancyFiller);
   }
 
   /** D6: 정렬(확정 시각 동률이면 id 큰 순)은 쿼리(EnrollmentRepositoryTest)에 위임하고, 여기서는 반환된 대상만 강등하는지 확인한다. */

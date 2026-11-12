@@ -34,6 +34,9 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
   List<Enrollment> findBySessionIdAndStatusOrderByConfirmedAtDescIdDesc(
       Long sessionId, EnrollmentStatus status, Pageable pageable);
 
+  List<Enrollment> findBySessionIdAndStatusOrderByWaitingKeyAsc(
+      Long sessionId, EnrollmentStatus status, Pageable pageable);
+
   Optional<Enrollment> findBySessionIdAndEmployeeIdAndStatusIn(
       Long sessionId, String employeeId, Collection<EnrollmentStatus> statuses);
 

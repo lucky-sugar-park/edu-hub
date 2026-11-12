@@ -26,6 +26,7 @@ class EnrollmentControllerTest {
 
   private static final String URL = "/api/v1/sessions/3/enrollments";
   private static final String ME_URL = "/api/v1/sessions/3/enrollments/me";
+  private static final String CANCEL_URL = "/api/v1/sessions/3/enrollments/me/cancel";
   private static final String HEADER = "X-Employee-Id";
 
   @Autowired private MockMvc mockMvc;
@@ -136,6 +137,69 @@ class EnrollmentControllerTest {
         .perform(get(ME_URL).header(HEADER, "E1001"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+  }
+
+  @Test
+  void cancelReturnsOkWithCancelledStatus() throws Exception {
+    given(enrollmentCommandService.cancel(3L, "E1001"))
+        .willReturn(
+            new EnrollmentResponse(
+                10L,
+                3L,
+                "E1001",
+                EnrollmentStatus.CANCELLED,
+                null,
+                Instant.parse("2026-11-12T01:00:00Z")));
+
+    mockMvc
+        .perform(post(CANCEL_URL).header(HEADER, "E1001"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(10))
+        .andExpect(jsonPath("$.status").value("CANCELLED"))
+        .andExpect(jsonPath("$.waitingNumber").value(nullValue()));
+    verify(enrollmentCommandService).cancel(3L, "E1001");
+  }
+
+  @Test
+  void cancelRejectsMissingHeader() throws Exception {
+    mockMvc
+        .perform(post(CANCEL_URL))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+    verifyNoInteractions(enrollmentCommandService);
+  }
+
+  @Test
+  void cancelReturnsNotFoundWhenNoActiveEnrollment() throws Exception {
+    given(enrollmentCommandService.cancel(3L, "E1001"))
+        .willThrow(new EnrollmentNotFoundException(3L));
+
+    mockMvc
+        .perform(post(CANCEL_URL).header(HEADER, "E1001"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+  }
+
+  @Test
+  void cancelReturnsConflictWhenSessionStarted() throws Exception {
+    given(enrollmentCommandService.cancel(3L, "E1001"))
+        .willThrow(new ConflictException("SESSION_STARTED", "교육이 시작된 회차는 취소할 수 없습니다: 3"));
+
+    mockMvc
+        .perform(post(CANCEL_URL).header(HEADER, "E1001"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("SESSION_STARTED"));
+  }
+
+  @Test
+  void cancelReturnsServiceUnavailableOnLockTimeout() throws Exception {
+    given(enrollmentCommandService.cancel(3L, "E1001"))
+        .willThrow(new CannotAcquireLockException("lock timeout"));
+
+    mockMvc
+        .perform(post(CANCEL_URL).header(HEADER, "E1001"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("LOCK_TIMEOUT"));
   }
 
   @Test

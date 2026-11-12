@@ -57,4 +57,65 @@ class EnrollmentTest {
     assertThatThrownBy(() -> enrollment.demote(1L)).isInstanceOf(IllegalStateException.class);
     assertThat(enrollment.getWaitingKey()).isEqualTo(3L);
   }
+
+  @Test
+  void cancelConfirmedKeepsConfirmedAt() {
+    Enrollment enrollment = Enrollment.confirmed(session, EMPLOYEE_ID, NOW);
+    Instant later = NOW.plusSeconds(60);
+
+    enrollment.cancel(later);
+
+    assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.CANCELLED);
+    assertThat(enrollment.getCancelledAt()).isEqualTo(later);
+    assertThat(enrollment.getConfirmedAt()).isEqualTo(NOW);
+    assertThat(enrollment.getWaitingKey()).isNull();
+  }
+
+  @Test
+  void cancelWaitingClearsWaitingKey() {
+    Enrollment enrollment = Enrollment.waiting(session, EMPLOYEE_ID, NOW, 4L);
+    Instant later = NOW.plusSeconds(60);
+
+    enrollment.cancel(later);
+
+    assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.CANCELLED);
+    assertThat(enrollment.getCancelledAt()).isEqualTo(later);
+    assertThat(enrollment.getWaitingKey()).isNull();
+    assertThat(enrollment.getConfirmedAt()).isNull();
+  }
+
+  @Test
+  void cancelRejectsAlreadyCancelledEnrollment() {
+    Enrollment enrollment = Enrollment.confirmed(session, EMPLOYEE_ID, NOW);
+    Instant first = NOW.plusSeconds(60);
+    enrollment.cancel(first);
+
+    assertThatThrownBy(() -> enrollment.cancel(NOW.plusSeconds(120)))
+        .isInstanceOf(IllegalStateException.class);
+    assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.CANCELLED);
+    assertThat(enrollment.getCancelledAt()).isEqualTo(first);
+  }
+
+  @Test
+  void promoteTurnsWaitingIntoConfirmed() {
+    Enrollment enrollment = Enrollment.waiting(session, EMPLOYEE_ID, NOW, 4L);
+    Instant later = NOW.plusSeconds(60);
+
+    enrollment.promote(later);
+
+    assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.CONFIRMED);
+    assertThat(enrollment.getConfirmedAt()).isEqualTo(later);
+    assertThat(enrollment.getWaitingKey()).isNull();
+    assertThat(enrollment.getAppliedAt()).isEqualTo(NOW);
+  }
+
+  @Test
+  void promoteRejectsConfirmedEnrollment() {
+    Enrollment enrollment = Enrollment.confirmed(session, EMPLOYEE_ID, NOW);
+
+    assertThatThrownBy(() -> enrollment.promote(NOW.plusSeconds(60)))
+        .isInstanceOf(IllegalStateException.class);
+    assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.CONFIRMED);
+    assertThat(enrollment.getConfirmedAt()).isEqualTo(NOW);
+  }
 }

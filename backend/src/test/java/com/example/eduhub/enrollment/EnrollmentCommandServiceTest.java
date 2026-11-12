@@ -39,6 +39,7 @@ class EnrollmentCommandServiceTest {
 
   @Mock private CourseSessionRepository courseSessionRepository;
   @Mock private EnrollmentRepository enrollmentRepository;
+  @Mock private VacancyFiller vacancyFiller;
 
   private EnrollmentCommandService service;
 
@@ -46,7 +47,11 @@ class EnrollmentCommandServiceTest {
   void setUp() {
     service =
         new EnrollmentCommandService(
-            courseSessionRepository, enrollmentRepository, Clock.fixed(NOW, ZoneOffset.UTC));
+            courseSessionRepository,
+            enrollmentRepository,
+            new WaitingNumbers(enrollmentRepository),
+            vacancyFiller,
+            Clock.fixed(NOW, ZoneOffset.UTC));
   }
 
   private CourseSession givenSession(Course course, Instant startAt, int capacity) {
@@ -279,6 +284,125 @@ class EnrollmentCommandServiceTest {
     givenSaveReturnsArgument();
 
     service.enroll(SESSION_ID, EMPLOYEE_ID);
+
+    verify(courseSessionRepository).findByIdForUpdate(SESSION_ID);
+    verify(courseSessionRepository, never()).findById(any());
+    verifyNoMoreInteractions(courseSessionRepository);
+  }
+
+  private Enrollment givenActiveEnrollment(CourseSession session, boolean confirmed) {
+    Enrollment enrollment =
+        confirmed
+            ? Enrollment.confirmed(session, EMPLOYEE_ID, NOW.minusSeconds(60))
+            : Enrollment.waiting(session, EMPLOYEE_ID, NOW.minusSeconds(60), 4L);
+    given(
+            enrollmentRepository.findBySessionIdAndEmployeeIdAndStatusIn(
+                SESSION_ID, EMPLOYEE_ID, WaitingNumbers.ACTIVE))
+        .willReturn(Optional.of(enrollment));
+    given(enrollmentRepository.saveAndFlush(any(Enrollment.class)))
+        .willAnswer(call -> call.getArgument(0));
+    return enrollment;
+  }
+
+  @Test
+  void x1ConfirmedCancelCancelsAndFillsVacancies() {
+    CourseSession session = givenOpenSession(10);
+    Enrollment enrollment = givenActiveEnrollment(session, true);
+
+    EnrollmentResponse response = service.cancel(SESSION_ID, EMPLOYEE_ID);
+
+    assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.CANCELLED);
+    assertThat(enrollment.getCancelledAt()).isEqualTo(NOW);
+    assertThat(response.status()).isEqualTo(EnrollmentStatus.CANCELLED);
+    assertThat(response.waitingNumber()).isNull();
+    verify(enrollmentRepository).saveAndFlush(enrollment);
+    verify(vacancyFiller).fillVacancies(session, NOW);
+  }
+
+  @Test
+  void x2WaitingCancelDoesNotFillVacancies() {
+    CourseSession session = givenOpenSession(10);
+    Enrollment enrollment = givenActiveEnrollment(session, false);
+
+    EnrollmentResponse response = service.cancel(SESSION_ID, EMPLOYEE_ID);
+
+    assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.CANCELLED);
+    assertThat(enrollment.getWaitingKey()).isNull();
+    assertThat(response.status()).isEqualTo(EnrollmentStatus.CANCELLED);
+    verify(vacancyFiller, never()).fillVacancies(any(), any());
+  }
+
+  @Test
+  void x3ConfirmedCancelWithNoWaitersStillCallsFiller() {
+    CourseSession session = givenOpenSession(10);
+    givenActiveEnrollment(session, true);
+    given(vacancyFiller.fillVacancies(session, NOW)).willReturn(0);
+
+    EnrollmentResponse response = service.cancel(SESSION_ID, EMPLOYEE_ID);
+
+    assertThat(response.status()).isEqualTo(EnrollmentStatus.CANCELLED);
+    verify(vacancyFiller).fillVacancies(session, NOW);
+  }
+
+  @Test
+  void x4RejectsCancelWhenStartEqualsNow() {
+    givenSession(new Course("JPA 입문", "개발", null), NOW, 10);
+
+    assertThatThrownBy(() -> service.cancel(SESSION_ID, EMPLOYEE_ID))
+        .isInstanceOfSatisfying(
+            ConflictException.class, e -> assertThat(e.getCode()).isEqualTo("SESSION_STARTED"));
+
+    verify(enrollmentRepository, never()).saveAndFlush(any());
+    verify(vacancyFiller, never()).fillVacancies(any(), any());
+  }
+
+  @Test
+  void x5RejectsCancelOnClosedSession() {
+    CourseSession session =
+        givenSession(new Course("JPA 입문", "개발", null), NOW.minusSeconds(60), 10);
+    session.close(NOW);
+
+    assertThatThrownBy(() -> service.cancel(SESSION_ID, EMPLOYEE_ID))
+        .isInstanceOfSatisfying(
+            ConflictException.class, e -> assertThat(e.getCode()).isEqualTo("SESSION_CLOSED"));
+
+    verify(enrollmentRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void x6ThrowsWhenNoActiveEnrollment() {
+    givenOpenSession(10);
+    given(
+            enrollmentRepository.findBySessionIdAndEmployeeIdAndStatusIn(
+                SESSION_ID, EMPLOYEE_ID, WaitingNumbers.ACTIVE))
+        .willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.cancel(SESSION_ID, EMPLOYEE_ID))
+        .isInstanceOf(EnrollmentNotFoundException.class);
+
+    verify(enrollmentRepository, never()).saveAndFlush(any());
+    verify(vacancyFiller, never()).fillVacancies(any(), any());
+  }
+
+  @Test
+  void x7AllowsCancelWhenCourseIsClosedAndSessionNotStarted() {
+    Course course = new Course("JPA 입문", "개발", null);
+    course.close();
+    CourseSession session = givenSession(course, FUTURE, 10);
+    Enrollment enrollment = givenActiveEnrollment(session, true);
+
+    EnrollmentResponse response = service.cancel(SESSION_ID, EMPLOYEE_ID);
+
+    assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.CANCELLED);
+    assertThat(response.status()).isEqualTo(EnrollmentStatus.CANCELLED);
+  }
+
+  @Test
+  void x8CancelUsesLockingLookupNotFindById() {
+    CourseSession session = givenOpenSession(10);
+    givenActiveEnrollment(session, true);
+
+    service.cancel(SESSION_ID, EMPLOYEE_ID);
 
     verify(courseSessionRepository).findByIdForUpdate(SESSION_ID);
     verify(courseSessionRepository, never()).findById(any());

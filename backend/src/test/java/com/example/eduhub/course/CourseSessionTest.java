@@ -42,6 +42,32 @@ class CourseSessionTest {
   }
 
   @Test
+  void allowsCancellationOneSecondBeforeStart() {
+    CourseSession session = sessionStartingAt(NOW.plusSeconds(1));
+
+    assertThatCode(() -> session.ensureCancellable(NOW)).doesNotThrowAnyException();
+  }
+
+  @Test
+  void rejectsCancellationAtStartTime() {
+    CourseSession session = sessionStartingAt(NOW);
+
+    assertThatThrownBy(() -> session.ensureCancellable(NOW))
+        .isInstanceOfSatisfying(
+            ConflictException.class, e -> assertThat(e.getCode()).isEqualTo("SESSION_STARTED"));
+  }
+
+  @Test
+  void checksClosedBeforeStartedOnCancellation() {
+    CourseSession session = sessionStartingAt(NOW.minusSeconds(3600));
+    session.close(NOW);
+
+    assertThatThrownBy(() -> session.ensureCancellable(NOW))
+        .isInstanceOfSatisfying(
+            ConflictException.class, e -> assertThat(e.getCode()).isEqualTo("SESSION_CLOSED"));
+  }
+
+  @Test
   void checksClosedBeforeStarted() {
     CourseSession session = sessionStartingAt(NOW.minusSeconds(3600));
     session.close(NOW);

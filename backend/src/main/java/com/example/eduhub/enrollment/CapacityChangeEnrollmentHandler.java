@@ -2,26 +2,36 @@ package com.example.eduhub.enrollment;
 
 import com.example.eduhub.course.CourseSession;
 import com.example.eduhub.course.SessionCapacityChangeHandler;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
-/** 정원 감소 시 가장 늦게 확정된 사람부터 기존 대기자보다 앞선 대기로 내린다(D-03, D-24). */
+/**
+ * 정원 감소 시 가장 늦게 확정된 사람부터 기존 대기자보다 앞선 대기로 내린다(D-03, D-24). 정원 증가 시에는 빈자리만큼 대기자를 승급한다(D-02, D-26).
+ */
 @Component
 public class CapacityChangeEnrollmentHandler implements SessionCapacityChangeHandler {
 
   private final EnrollmentRepository enrollmentRepository;
 
-  public CapacityChangeEnrollmentHandler(EnrollmentRepository enrollmentRepository) {
+  private final VacancyFiller vacancyFiller;
+  private final Clock clock;
+
+  public CapacityChangeEnrollmentHandler(
+      EnrollmentRepository enrollmentRepository, VacancyFiller vacancyFiller, Clock clock) {
     this.enrollmentRepository = enrollmentRepository;
+    this.vacancyFiller = vacancyFiller;
+    this.clock = clock;
   }
 
   @Override
   public void onCapacityChanged(CourseSession session, int oldCapacity, int newCapacity) {
     if (newCapacity > oldCapacity) {
-      // TODO(FR-06, D-02): 정원이 늘면 대기자를 앞에서부터 승급한다.
+      // 정원이 늘면 대기자를 앞에서부터 승급한다(D-02). 실제 승급 수는 VacancyFiller가 정한다.
+      vacancyFiller.fillVacancies(session, clock.instant());
       return;
     }
     if (newCapacity == oldCapacity) {
