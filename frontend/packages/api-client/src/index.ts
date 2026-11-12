@@ -1,8 +1,9 @@
-export { Configuration, CourseAdminApi, CourseApi } from "./generated";
+export { Configuration, CourseAdminApi, CourseApi, EnrollmentApi } from "./generated";
 export type {
   CourseDetailResponse,
   CourseRequest,
   CourseSummaryResponse,
+  EnrollmentResponse,
   ErrorResponse,
   PageResponseCourseSummaryResponse,
   SessionRequest,

@@ -58,6 +58,21 @@ export const CourseSummaryResponseStatusEnum = {
 
 export type CourseSummaryResponseStatusEnum = typeof CourseSummaryResponseStatusEnum[keyof typeof CourseSummaryResponseStatusEnum];
 
+export interface EnrollmentResponse {
+    'id'?: number;
+    'sessionId'?: number;
+    'employeeId'?: string;
+    'status'?: EnrollmentResponseStatusEnum;
+    'appliedAt'?: string;
+}
+
+export const EnrollmentResponseStatusEnum = {
+    Confirmed: 'CONFIRMED',
+    Waiting: 'WAITING',
+} as const;
+
+export type EnrollmentResponseStatusEnum = typeof EnrollmentResponseStatusEnum[keyof typeof EnrollmentResponseStatusEnum];
+
 export interface ErrorResponse {
     'code'?: string;
     'message'?: string;
@@ -751,6 +766,116 @@ export class CourseAdminApi extends BaseAPI {
      */
     public updateSession(sessionId: number, sessionRequest: SessionRequest, options?: RawAxiosRequestConfig) {
         return CourseAdminApiFp(this.configuration).updateSession(sessionId, sessionRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * EnrollmentApi - axios parameter creator
+ */
+export const EnrollmentApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 정원 안이면 CONFIRMED, 정원이 찼으면 WAITING으로 저장한다
+         * @summary 회차에 수강 신청한다
+         * @param {number} sessionId 
+         * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        enroll: async (sessionId: number, xEmployeeId: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'sessionId' is not null or undefined
+            assertParamExists('enroll', 'sessionId', sessionId)
+            // verify required parameter 'xEmployeeId' is not null or undefined
+            assertParamExists('enroll', 'xEmployeeId', xEmployeeId)
+            const localVarPath = `/api/v1/sessions/{sessionId}/enrollments`
+                .replace('{sessionId}', encodeURIComponent(String(sessionId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            if (xEmployeeId != null) {
+                localVarHeaderParameter['X-Employee-Id'] = String(xEmployeeId);
+            }
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * EnrollmentApi - functional programming interface
+ */
+export const EnrollmentApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = EnrollmentApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 정원 안이면 CONFIRMED, 정원이 찼으면 WAITING으로 저장한다
+         * @summary 회차에 수강 신청한다
+         * @param {number} sessionId 
+         * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async enroll(sessionId: number, xEmployeeId: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<EnrollmentResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.enroll(sessionId, xEmployeeId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['EnrollmentApi.enroll']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * EnrollmentApi - factory interface
+ */
+export const EnrollmentApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = EnrollmentApiFp(configuration)
+    return {
+        /**
+         * 정원 안이면 CONFIRMED, 정원이 찼으면 WAITING으로 저장한다
+         * @summary 회차에 수강 신청한다
+         * @param {number} sessionId 
+         * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        enroll(sessionId: number, xEmployeeId: string, options?: RawAxiosRequestConfig): AxiosPromise<EnrollmentResponse> {
+            return localVarFp.enroll(sessionId, xEmployeeId, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * EnrollmentApi - object-oriented interface
+ */
+export class EnrollmentApi extends BaseAPI {
+    /**
+     * 정원 안이면 CONFIRMED, 정원이 찼으면 WAITING으로 저장한다
+     * @summary 회차에 수강 신청한다
+     * @param {number} sessionId 
+     * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public enroll(sessionId: number, xEmployeeId: string, options?: RawAxiosRequestConfig) {
+        return EnrollmentApiFp(this.configuration).enroll(sessionId, xEmployeeId, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
