@@ -21,6 +21,7 @@
 - Controller → Service → Repository 순서로 호출한다. Controller에서 Repository를 직접 호출하지 않는다.
 - 조회 서비스(`CourseQueryService`, readOnly)와 쓰기 서비스(`CourseCommandService`)를 나눈다. 관리자 쓰기 API는 `/api/v1/admin` 아래(`CourseAdminController`)에 둔다(D-18).
 - 상태 규칙(종료 여부, 시작 여부)은 엔티티 메서드에서 검사한다. 현재 시각은 `Clock` 빈(`common/ClockConfig`)으로 받아 테스트에서 고정한다.
+- 프런트 빌드 결과는 `src/main/resources/static`에 두고 백엔드가 함께 제공한다. 화면 경로(`/admin`, `/courses/{id}`)는 `common/SpaForwardController`가 `index.html`로 넘긴다. 프런트에 화면 경로를 추가하면 여기에도 추가한다.
 - 패키지는 `com.example.eduhub` 아래 도메인별로 나눈다. `course`는 과정과 회차, `enrollment`는 신청·대기·취소·승급·수료, `common`은 공통 코드를 담는다(NFR-07).
 
 ## JPA 규칙

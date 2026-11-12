@@ -27,6 +27,15 @@ class OpenApiDocsTest {
   }
 
   @Test
+  void apiDocsExcludeScreenRoutes() throws Exception {
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/admin']").doesNotExist())
+        .andExpect(jsonPath("$.paths['/courses/{id}']").doesNotExist());
+  }
+
+  @Test
   void apiDocsIncludeCourseEndpoints() throws Exception {
     mockMvc
         .perform(get("/v3/api-docs"))
