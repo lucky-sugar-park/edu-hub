@@ -22,7 +22,7 @@
 - 조회 서비스(`CourseQueryService`, readOnly)와 쓰기 서비스(`CourseCommandService`)를 나눈다. 관리자 쓰기 API는 `/api/v1/admin` 아래(`CourseAdminController`)에 둔다(D-18).
 - 상태 규칙(종료 여부, 시작 여부)은 엔티티 메서드에서 검사한다. 현재 시각은 `Clock` 빈(`common/ClockConfig`)으로 받아 테스트에서 고정한다.
 - 프런트 빌드 결과는 `src/main/resources/static`에 두고 백엔드가 함께 제공한다. 화면 경로(`/admin`, `/courses/{id}`)는 `common/SpaForwardController`가 `index.html`로 넘긴다. 프런트에 화면 경로를 추가하면 여기에도 추가한다.
-- `course`는 `enrollment`를 참조하지 않는다. 확정 수는 `course/SessionSeatCounter`로 받는다(D-22).
+- `course`는 `enrollment`를 참조하지 않는다. 확정 수는 `course/SessionSeatCounter`로 받는다(D-22). 정원 변경에 따른 강등도 같은 방식으로 `course/SessionCapacityChangeHandler`를 `enrollment`가 구현해 받는다(D-24).
 - 패키지는 `com.example.eduhub` 아래 도메인별로 나눈다. `course`는 과정과 회차, `enrollment`는 신청·대기·취소·승급·수료, `common`은 공통 코드를 담는다(NFR-07).
 
 ## JPA 규칙
@@ -37,7 +37,7 @@
 - 모든 API는 OpenAPI 문서가 있어야 하고, 프론트 클라이언트는 이 스펙에서 생성한다(NFR-04).
 - 문서는 springdoc 기본 경로인 `/v3/api-docs`와 `/swagger-ui.html`에서 제공된다.
 - 에러 응답은 `common/ErrorResponse`(`code`, `message`) 형식이며, `common/GlobalExceptionHandler`에서 처리한다.
-  - 404: `NotFoundException` 하위 클래스, code `NOT_FOUND`.
+  - 404: `NotFoundException` 하위 클래스(`CourseNotFoundException`, `SessionNotFoundException`, `EnrollmentNotFoundException` 등), code `NOT_FOUND`.
   - 400: 요청 본문 검증 실패는 code `BAD_REQUEST`, message `필드: 메시지, ...`(필드 이름 순). Bean Validation 메시지는 한국어로 직접 적는다. 그 밖의 입력 오류는 `InvalidRequestException`.
   - 409: `ConflictException(code, message)`. code는 `COURSE_CLOSED`, `SESSION_CLOSED`, `SESSION_STARTED`, `SESSION_NOT_STARTED`, `DUPLICATE_ENROLLMENT`(같은 회차 활성 신청 중복)처럼 상황별로 둔다.
   - 503: `PessimisticLockingFailureException`(회차 행 락 대기 3초 초과), code `LOCK_TIMEOUT`(D-20).
@@ -52,9 +52,9 @@
 
 - 동시성 테스트(NFR-01)는 락과 인덱스 동작을 확인해야 하므로 H2가 아닌 실제 MariaDB에서 돌린다.
 - 취소 후 재신청이 가능하므로(D-05), 중복 신청 방지에 `회차+사용자` 일반 유니크 제약을 쓸 수 없다. MariaDB에는 부분 인덱스도 없으므로 생성 컬럼 `active_session_id`에 유일 제약을 건다(D-19).
-- 신청 동시성은 회차 행 `PESSIMISTIC_WRITE`를 첫 쿼리로 잡고 격리 수준은 `READ_COMMITTED`로 한다(D-20). 수량을 바꾸는 코드는 같은 락을 쓴다.
+- 신청 동시성은 회차 행 `PESSIMISTIC_WRITE`를 첫 쿼리로 잡고 격리 수준은 `READ_COMMITTED`로 한다(D-20). 수량을 바꾸는 코드는 같은 락을 쓴다. 관리자 `updateSession`도 회차 행 락을 첫 쿼리로 잡고 `READ_COMMITTED`로 실행한다(D-24).
 - 정원 감소 시 대기로 바뀐 사람은 기존 대기자보다 앞 순번이 된다(D-03). 대기 순서를 설계할 때 이를 고려한다.
-- 대기 순서 표현 방식은 아직 정해지지 않았다. FR-05에서 정하고 `docs/requirements.md`의 "결정 사항"에 기록한다.
+- 대기 순서는 `waiting_key`(작을수록 앞, 회차 안에서 유일)로 표현하고, 순번은 조회할 때 "키가 더 작은 대기자 수 + 1"로 계산한다. 새 대기자는 최댓값 + 1, 강등자는 최솟값보다 작은 키를 받으며, 대기에서 벗어나면 키를 지운다(D-23).
 
 ## 빌드 환경 주의
 
