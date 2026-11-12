@@ -298,7 +298,7 @@ class CourseCommandServiceTest {
 
     @Test
     void closeSessionAfterStartCompletesSession() {
-      givenSession(5L, PAST);
+      givenLockedSession(5L, PAST);
 
       SessionResponse response = service.closeSession(5L);
 
@@ -306,22 +306,32 @@ class CourseCommandServiceTest {
     }
 
     @Test
+    void closeSessionUsesLockedQueryNotPlainFindById() {
+      givenLockedSession(5L, PAST);
+
+      service.closeSession(5L);
+
+      verify(courseSessionRepository).findByIdForUpdate(5L);
+      verify(courseSessionRepository, never()).findById(any());
+    }
+
+    @Test
     void closeSessionBeforeStartFails() {
-      givenSession(5L, FUTURE);
+      givenLockedSession(5L, FUTURE);
 
       assertConflict(() -> service.closeSession(5L), "SESSION_NOT_STARTED");
     }
 
     @Test
     void closeSessionFailsWhenAlreadyClosed() {
-      givenSession(5L, PAST).close(NOW);
+      givenLockedSession(5L, PAST).close(NOW);
 
       assertConflict(() -> service.closeSession(5L), "SESSION_CLOSED");
     }
 
     @Test
     void closeSessionWorksEvenIfCourseClosed() {
-      CourseSession session = givenSession(5L, PAST);
+      CourseSession session = givenLockedSession(5L, PAST);
       session.getCourse().close();
 
       assertThat(service.closeSession(5L).status()).isEqualTo(CourseSessionStatus.CLOSED);
@@ -329,7 +339,7 @@ class CourseCommandServiceTest {
 
     @Test
     void closeSessionFailsWhenMissing() {
-      given(courseSessionRepository.findById(9L)).willReturn(Optional.empty());
+      given(courseSessionRepository.findByIdForUpdate(9L)).willReturn(Optional.empty());
 
       assertThatThrownBy(() -> service.closeSession(9L))
           .isInstanceOf(SessionNotFoundException.class);
@@ -339,12 +349,6 @@ class CourseCommandServiceTest {
   private Course givenCourse(Long id, Course course) {
     given(courseRepository.findById(id)).willReturn(Optional.of(course));
     return course;
-  }
-
-  private CourseSession givenSession(Long id, Instant startAt) {
-    CourseSession session = new CourseSession(new Course("JPA 입문", "개발", null), startAt, "본사", 10);
-    given(courseSessionRepository.findById(id)).willReturn(Optional.of(session));
-    return session;
   }
 
   private CourseSession givenLockedSession(Long id, Instant startAt) {

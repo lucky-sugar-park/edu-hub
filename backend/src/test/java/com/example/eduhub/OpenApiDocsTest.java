@@ -61,6 +61,11 @@ class OpenApiDocsTest {
         .andExpect(
             jsonPath("$.paths['/api/v1/admin/sessions/{sessionId}/close'].post.responses['409']")
                 .exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/admin/sessions/{sessionId}'].put.responses['503']").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/admin/sessions/{sessionId}/close'].post.responses['503']")
+                .exists())
         .andExpect(jsonPath("$.components.schemas.SessionRequest.required").isArray());
   }
 

@@ -7,6 +7,8 @@ import java.util.Collections;
 import java.util.List;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /** 정원 감소 시 가장 늦게 확정된 사람부터 기존 대기자보다 앞선 대기로 내린다(D-03, D-24). */
 @Component
@@ -19,6 +21,7 @@ public class CapacityChangeEnrollmentHandler implements SessionCapacityChangeHan
   }
 
   @Override
+  @Transactional(propagation = Propagation.MANDATORY)
   public void onCapacityChanged(CourseSession session, int oldCapacity, int newCapacity) {
     if (newCapacity > oldCapacity) {
       // TODO(FR-06, D-02): 정원이 늘면 대기자를 앞에서부터 승급한다.

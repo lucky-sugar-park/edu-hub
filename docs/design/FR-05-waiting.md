@@ -120,7 +120,7 @@ FR-04 흐름 ①~⑤는 그대로. ⑤의 판정 뒤에:
   - `findSession`(락 없음) 대신 `findByIdForUpdate`로 회차 락을 첫 쿼리로 잡는다.
   - `@Transactional(isolation = READ_COMMITTED)`를 메서드에 지정한다.
   - `session.update(...)` 뒤에 정원이 줄었으면 핸들러를 호출한다.
-- **핸들러 구현 (`enrollment/CapacityDecreaseDemoter`)**
+- **핸들러 구현 (`enrollment/CapacityChangeEnrollmentHandler`)**
   1. 확정 수 > 새 정원이면 초과 n명을 `confirmedAt` 내림차순(동률은 `id` 내림차순)으로 고른다.
   2. 이들을 "먼저 확정된 사람이 앞"이 되도록 오름차순으로 다시 정렬한다.
   3. 키를 `min(waiting_key)`(없으면 1) − n부터 차례로 `demote(key)`한다.
@@ -143,7 +143,7 @@ FR-04 흐름 ①~⑤는 그대로. ⑤의 판정 뒤에:
 
 ## 7. 테스트 시나리오
 
-### 7.1 단위 (`EnrollmentCommandServiceTest`, 신규 `CapacityDecreaseDemoterTest`, `CourseCommandServiceTest`)
+### 7.1 단위 (`EnrollmentCommandServiceTest`, 신규 `CapacityChangeEnrollmentHandlerTest`, `CourseCommandServiceTest`)
 
 | # | 시나리오 | 기대 |
 |---|---|---|

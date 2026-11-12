@@ -115,6 +115,10 @@ public class CourseAdminController {
       responseCode = "409",
       description = "종료된 회차(SESSION_CLOSED) 또는 시작 후 정원·시작 시각 변경(SESSION_STARTED)",
       content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  @ApiResponse(
+      responseCode = "503",
+      description = "회차 락 대기 초과(LOCK_TIMEOUT)",
+      content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   @PutMapping("/sessions/{sessionId}")
   public SessionResponse updateSession(
       @PathVariable Long sessionId, @Valid @RequestBody SessionRequest request) {
@@ -130,6 +134,10 @@ public class CourseAdminController {
   @ApiResponse(
       responseCode = "409",
       description = "이미 종료된 회차(SESSION_CLOSED) 또는 시작 전 회차(SESSION_NOT_STARTED)",
+      content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  @ApiResponse(
+      responseCode = "503",
+      description = "회차 락 대기 초과(LOCK_TIMEOUT)",
       content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   @PostMapping("/sessions/{sessionId}/close")
   public SessionResponse closeSession(@PathVariable Long sessionId) {

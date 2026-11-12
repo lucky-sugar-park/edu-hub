@@ -82,8 +82,13 @@ public class CourseCommandService {
     return toSessionResponse(session);
   }
 
+  /** 회차 락을 첫 쿼리로 잡아 신청과 직렬화한다(D-20, D-24). */
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public SessionResponse closeSession(Long sessionId) {
-    CourseSession session = findSession(sessionId);
+    CourseSession session =
+        courseSessionRepository
+            .findByIdForUpdate(sessionId)
+            .orElseThrow(() -> new SessionNotFoundException(sessionId));
     session.close(now());
     return toSessionResponse(session);
   }
@@ -92,12 +97,6 @@ public class CourseCommandService {
     return courseRepository
         .findById(courseId)
         .orElseThrow(() -> new CourseNotFoundException(courseId));
-  }
-
-  private CourseSession findSession(Long sessionId) {
-    return courseSessionRepository
-        .findById(sessionId)
-        .orElseThrow(() -> new SessionNotFoundException(sessionId));
   }
 
   private CourseDetailResponse toDetail(Course course) {

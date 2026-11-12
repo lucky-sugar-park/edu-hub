@@ -301,6 +301,56 @@ class EnrollmentConcurrencyTest {
         .containsExactlyInAnyOrderElementsOf(expectedNew);
   }
 
+  @Test
+  @DisplayName("C6b: 정원 10·확정 3에서 정원 5 감소와 신규 신청 30건이 섞여도 확정은 5명 이하이고 예외가 없다")
+  void capacityDecreaseWithNewApplicationsOnPartiallyFilledSession() throws Exception {
+    Long sessionId = givenSession(givenCourse(), 10);
+    for (int i = 0; i < 3; i++) {
+      enrollmentCommandService.enroll(sessionId, "C6B-PRE-" + i);
+    }
+    CourseSession session = courseSessionRepository.findById(sessionId).orElseThrow();
+    SessionRequest decrease = new SessionRequest(session.getStartAt(), session.getPlace(), 5);
+
+    List<Callable<String>> tasks = new ArrayList<>();
+    for (int i = 0; i < 30; i++) {
+      if (i == 10) {
+        tasks.add(() -> {
+          try {
+            courseCommandService.updateSession(sessionId, decrease);
+            return "UPDATED";
+          } catch (Throwable throwable) {
+            return "UPDATE_" + throwable.getClass().getName();
+          }
+        });
+      }
+      tasks.add(enrollTask(sessionId, "C6B-NEW-" + i));
+    }
+    Map<String, Integer> distribution = runConcurrently(tasks);
+
+    long confirmedInDb =
+        enrollmentRepository.countBySessionIdAndStatus(sessionId, EnrollmentStatus.CONFIRMED);
+    List<Long> waitingKeys =
+        jdbcTemplate.queryForList(
+            "SELECT waiting_key FROM enrollment WHERE session_id = ? AND status = 'WAITING'",
+            Long.class,
+            sessionId);
+    Integer capacityInDb =
+        jdbcTemplate.queryForObject(
+            "SELECT capacity FROM course_session WHERE id = ?", Integer.class, sessionId);
+    String state =
+        "분포 %s, 정원 %d, 확정 %d, 대기 키 %s"
+            .formatted(distribution, capacityInDb, confirmedInDb, waitingKeys);
+
+    // 예외 0건: 정원 변경 1건 성공, 신규 신청 30건은 모두 확정 또는 대기
+    assertThat(distribution.keySet()).as(state).isSubsetOf("UPDATED", "CONFIRMED", "WAITING");
+    assertThat(distribution.getOrDefault("UPDATED", 0)).as(state).isEqualTo(1);
+    assertThat(capacityInDb).as(state).isEqualTo(5);
+    // I1: 신청이 33건이라 정원이 차는 것이 정상이므로 확정은 정확히 5명
+    assertThat(confirmedInDb).as("I1 " + state).isEqualTo(5);
+    // 대기 키 중복 없음
+    assertThat(waitingKeys).as("대기 키 중복 " + state).doesNotHaveDuplicates();
+  }
+
   private Long givenCourse() {
     Course course = courseRepository.save(new Course("동시성 테스트 과정", "테스트", null));
     courseIds.add(course.getId());
