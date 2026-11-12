@@ -63,6 +63,7 @@ export interface EnrollmentResponse {
     'sessionId'?: number;
     'employeeId'?: string;
     'status'?: EnrollmentResponseStatusEnum;
+    'waitingNumber'?: number;
     'appliedAt'?: string;
 }
 
@@ -777,7 +778,7 @@ export class CourseAdminApi extends BaseAPI {
 export const EnrollmentApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
         /**
-         * 정원 안이면 CONFIRMED, 정원이 찼으면 WAITING으로 저장한다
+         * 정원 안이고 대기자가 없으면 CONFIRMED, 아니면 WAITING으로 저장한다. WAITING이면 응답의 waitingNumber에 대기 순번이 있고 CONFIRMED면 null이다
          * @summary 회차에 수강 신청한다
          * @param {number} sessionId 
          * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
@@ -816,6 +817,46 @@ export const EnrollmentApiAxiosParamCreator = function (configuration?: Configur
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * 그 회차의 활성 신청(CONFIRMED 또는 WAITING)을 돌려준다. WAITING이면 현재 waitingNumber가 있다
+         * @summary 회차의 내 신청과 대기 순번을 조회한다
+         * @param {number} sessionId 
+         * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getMyEnrollment: async (sessionId: number, xEmployeeId: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'sessionId' is not null or undefined
+            assertParamExists('getMyEnrollment', 'sessionId', sessionId)
+            // verify required parameter 'xEmployeeId' is not null or undefined
+            assertParamExists('getMyEnrollment', 'xEmployeeId', xEmployeeId)
+            const localVarPath = `/api/v1/sessions/{sessionId}/enrollments/me`
+                .replace('{sessionId}', encodeURIComponent(String(sessionId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            if (xEmployeeId != null) {
+                localVarHeaderParameter['X-Employee-Id'] = String(xEmployeeId);
+            }
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -826,7 +867,7 @@ export const EnrollmentApiFp = function(configuration?: Configuration) {
     const localVarAxiosParamCreator = EnrollmentApiAxiosParamCreator(configuration)
     return {
         /**
-         * 정원 안이면 CONFIRMED, 정원이 찼으면 WAITING으로 저장한다
+         * 정원 안이고 대기자가 없으면 CONFIRMED, 아니면 WAITING으로 저장한다. WAITING이면 응답의 waitingNumber에 대기 순번이 있고 CONFIRMED면 null이다
          * @summary 회차에 수강 신청한다
          * @param {number} sessionId 
          * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
@@ -839,6 +880,20 @@ export const EnrollmentApiFp = function(configuration?: Configuration) {
             const localVarOperationServerBasePath = operationServerMap['EnrollmentApi.enroll']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
+        /**
+         * 그 회차의 활성 신청(CONFIRMED 또는 WAITING)을 돌려준다. WAITING이면 현재 waitingNumber가 있다
+         * @summary 회차의 내 신청과 대기 순번을 조회한다
+         * @param {number} sessionId 
+         * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getMyEnrollment(sessionId: number, xEmployeeId: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<EnrollmentResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getMyEnrollment(sessionId, xEmployeeId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['EnrollmentApi.getMyEnrollment']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
     }
 };
 
@@ -849,7 +904,7 @@ export const EnrollmentApiFactory = function (configuration?: Configuration, bas
     const localVarFp = EnrollmentApiFp(configuration)
     return {
         /**
-         * 정원 안이면 CONFIRMED, 정원이 찼으면 WAITING으로 저장한다
+         * 정원 안이고 대기자가 없으면 CONFIRMED, 아니면 WAITING으로 저장한다. WAITING이면 응답의 waitingNumber에 대기 순번이 있고 CONFIRMED면 null이다
          * @summary 회차에 수강 신청한다
          * @param {number} sessionId 
          * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
@@ -859,6 +914,17 @@ export const EnrollmentApiFactory = function (configuration?: Configuration, bas
         enroll(sessionId: number, xEmployeeId: string, options?: RawAxiosRequestConfig): AxiosPromise<EnrollmentResponse> {
             return localVarFp.enroll(sessionId, xEmployeeId, options).then((request) => request(axios, basePath));
         },
+        /**
+         * 그 회차의 활성 신청(CONFIRMED 또는 WAITING)을 돌려준다. WAITING이면 현재 waitingNumber가 있다
+         * @summary 회차의 내 신청과 대기 순번을 조회한다
+         * @param {number} sessionId 
+         * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getMyEnrollment(sessionId: number, xEmployeeId: string, options?: RawAxiosRequestConfig): AxiosPromise<EnrollmentResponse> {
+            return localVarFp.getMyEnrollment(sessionId, xEmployeeId, options).then((request) => request(axios, basePath));
+        },
     };
 };
 
@@ -867,7 +933,7 @@ export const EnrollmentApiFactory = function (configuration?: Configuration, bas
  */
 export class EnrollmentApi extends BaseAPI {
     /**
-     * 정원 안이면 CONFIRMED, 정원이 찼으면 WAITING으로 저장한다
+     * 정원 안이고 대기자가 없으면 CONFIRMED, 아니면 WAITING으로 저장한다. WAITING이면 응답의 waitingNumber에 대기 순번이 있고 CONFIRMED면 null이다
      * @summary 회차에 수강 신청한다
      * @param {number} sessionId 
      * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
@@ -876,6 +942,18 @@ export class EnrollmentApi extends BaseAPI {
      */
     public enroll(sessionId: number, xEmployeeId: string, options?: RawAxiosRequestConfig) {
         return EnrollmentApiFp(this.configuration).enroll(sessionId, xEmployeeId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 그 회차의 활성 신청(CONFIRMED 또는 WAITING)을 돌려준다. WAITING이면 현재 waitingNumber가 있다
+     * @summary 회차의 내 신청과 대기 순번을 조회한다
+     * @param {number} sessionId 
+     * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getMyEnrollment(sessionId: number, xEmployeeId: string, options?: RawAxiosRequestConfig) {
+        return EnrollmentApiFp(this.configuration).getMyEnrollment(sessionId, xEmployeeId, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
