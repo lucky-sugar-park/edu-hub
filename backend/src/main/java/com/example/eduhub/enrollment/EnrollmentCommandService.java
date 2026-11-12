@@ -40,6 +40,8 @@ public class EnrollmentCommandService {
    * 회차에 신청한다. 정원 안이면 확정, 찼으면 대기로 저장한다.
    *
    * <p>회차 락 조회가 트랜잭션의 첫 쿼리여야 한다. READ_COMMITTED로 두어 락을 얻은 뒤의 확정 수 조회가 앞 트랜잭션의 커밋을 항상 보게 한다.
+   *
+   * <p>판정 전에 빈자리를 먼저 채워(자기 복구, D-26) "확정 < 정원인데 대기자가 있는" 오래된 상태를 풀고, 채운 뒤의 확정 수·대기 수로 판정한다.
    */
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public EnrollmentResponse enroll(Long sessionId, String employeeId) {
@@ -54,6 +56,8 @@ public class EnrollmentCommandService {
         sessionId, employeeId, WaitingNumbers.ACTIVE)) {
       throw new DuplicateEnrollmentException(sessionId);
     }
+    // 자기 복구: FR-05 기간에 남은 빈자리+대기자 상태를 판정 전에 푼다.
+    vacancyFiller.fillVacancies(session, now);
     long confirmed =
         enrollmentRepository.countBySessionIdAndStatus(sessionId, EnrollmentStatus.CONFIRMED);
     long waiting =
@@ -72,7 +76,7 @@ public class EnrollmentCommandService {
   }
 
   /**
-   * 내 활성 신청을 취소한다(FR-06). 확정자가 취소하면 같은 트랜잭션에서 대기 1순위를 승급시킨다(D-01).
+   * 내 활성 신청을 취소한다(FR-06). 확정자가 취소하면 같은 트랜잭션에서 대기 1순위를 승급시킨다(D-01, D-26).
    *
    * <p>회차 락 조회가 첫 쿼리이다. 과정이 종료되어도 취소할 수 있으므로 과정 종료는 검사하지 않는다(D-25).
    */
@@ -88,12 +92,11 @@ public class EnrollmentCommandService {
         enrollmentRepository
             .findBySessionIdAndEmployeeIdAndStatusIn(sessionId, employeeId, WaitingNumbers.ACTIVE)
             .orElseThrow(() -> new EnrollmentNotFoundException(sessionId));
-    boolean wasConfirmed = enrollment.getStatus() == EnrollmentStatus.CONFIRMED;
     enrollment.cancel(now);
     enrollmentRepository.saveAndFlush(enrollment);
-    if (wasConfirmed) {
-      vacancyFiller.fillVacancies(session, now);
-    }
+    // 취소한 사람이 대기자여도 항상 부른다. 정상 데이터에서는 승급이 없지만(D-01),
+    // "확정 < 정원이고 대기자가 있는" 오래된 상태를 자기 복구하기 위해서다(D-26).
+    vacancyFiller.fillVacancies(session, now);
     // TODO(FR-09): 승급 알림
     return EnrollmentResponse.of(enrollment, null);
   }

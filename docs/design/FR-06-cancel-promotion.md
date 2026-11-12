@@ -40,6 +40,20 @@ fillVacancies(session, now):
 - 승급자의 `confirmed_at`은 승급 시각이다. 나중에 정원이 줄면 승급자가 "가장 늦게 확정된 사람"으로 먼저 강등된다(D-03과 일관).
 - 과정이 종료된 회차(D-15, 모집 종료)도 시작 전이면 취소와 승급을 허용한다(Q2). 승급은 신규 신청이 아니기 때문이다.
 
+### 2.1 자기 복구 (최종 검토 W1, 2026-11-12 결정)
+
+FR-05 기간에는 정원을 늘려도 승급이 없어서 "확정 < 정원이고 대기자가 있는" 회차가 남을 수 있다. 이 상태는 확정자 취소나 정원 증가가 다시 일어나기 전에는 풀리지 않는다. 그래서 회차를 다루는 모든 쓰기 경로가 회차 락을 잡은 직후 `fillVacancies`를 먼저 부른다.
+
+| 경로 | 부르는 시점 |
+|---|---|
+| 신청 `enroll` | 중복 검사 뒤, 확정·대기 판정 전. 채운 뒤의 확정 수·대기 수로 판정한다 |
+| 취소 `cancel` | 취소 저장 뒤, 취소한 사람의 상태와 관계없이 항상 |
+| 정원 변경 | 정원이 바뀐 모든 경우. 증가면 승급(D-02), 감소면 강등(D-03) 뒤에도 빈자리가 남으면 채운다 |
+
+정상 데이터에서는 이미 빈자리와 대기자가 함께 있지 않으므로 결과가 달라지지 않는다. 비용은 회차당 확정 수 조회 1회다.
+
+한계: 중복 신청(409), 종료·시작 후 같은 예외 경로에서는 트랜잭션이 롤백되어 채우기도 함께 취소된다. 이런 회차는 다음 정상 요청(신청·취소·정원 변경) 때 정리된다.
+
 ## 3. API
 
 ### 3.1 `POST /api/v1/sessions/{sessionId}/enrollments/me/cancel` (신규, Q1)
@@ -100,17 +114,16 @@ public EnrollmentResponse cancel(Long sessionId, String employeeId) {
   Enrollment enrollment = enrollmentRepository
       .findBySessionIdAndEmployeeIdAndStatusIn(sessionId, employeeId, ACTIVE)      // ③ 없으면 404
       .orElseThrow(() -> new EnrollmentNotFoundException(sessionId));
-  boolean wasConfirmed = enrollment.getStatus() == CONFIRMED;
   enrollment.cancel(now);
   enrollmentRepository.saveAndFlush(enrollment);
-  if (wasConfirmed) vacancyFiller.fillVacancies(session, now);                      // ④ 대기 1순위 승급
+  vacancyFiller.fillVacancies(session, now);                                        // ④ 빈자리 채우기(확정자 취소면 대기 1순위 승급, 자기 복구)
   // TODO(FR-09): 승급 알림
   return EnrollmentResponse.of(enrollment, null);
 }
 ```
 
 - `CourseSession.ensureCancellable(now)`는 `ensureEnrollable`과 같은 검사(종료 → 시작)다. 이름을 나눠 규칙 근거(D-07)를 드러낸다.
-- 대기자 취소는 ④를 건너뛴다(D-01). 다만 `fillVacancies`를 항상 불러도 빈자리가 없어 결과는 같다. 의도를 드러내려고 분기한다.
+- ④는 취소한 사람이 확정자든 대기자든 항상 부른다. 대기자 취소는 빈자리를 만들지 않으므로 정상 데이터에서는 승급이 없다(D-01). 항상 부르는 것은 자기 복구를 위해서다(2.1절).
 
 ## 5. 트랜잭션·동시성
 

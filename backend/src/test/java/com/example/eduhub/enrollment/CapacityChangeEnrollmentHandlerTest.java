@@ -139,13 +139,33 @@ class CapacityChangeEnrollmentHandlerTest {
   }
 
   @Test
-  void doesNotFillOnDecreaseOrSameCapacity() {
+  void fillsVacanciesAfterDecreaseWithDemotion() {
+    Enrollment e = confirmed(14L, T1);
+    givenConfirmedCount(4);
+    givenTargets(1, List.of(e));
+
+    handler.onCapacityChanged(session, 5, 3);
+
+    org.mockito.InOrder order = org.mockito.Mockito.inOrder(enrollmentRepository, vacancyFiller);
+    order.verify(enrollmentRepository).saveAllAndFlush(List.of(e));
+    order.verify(vacancyFiller).fillVacancies(session, NOW);
+  }
+
+  @Test
+  void fillsVacanciesOnDecreaseEvenWhenNoDemotionNeeded() {
     givenConfirmedCount(3);
 
     handler.onCapacityChanged(session, 5, 3);
+
+    verify(vacancyFiller).fillVacancies(session, NOW);
+  }
+
+  @Test
+  void doesNothingWhenCapacityIsSame() {
     handler.onCapacityChanged(session, 5, 5);
 
     verifyNoInteractions(vacancyFiller);
+    verifyNoInteractions(enrollmentRepository);
   }
 
   /** D6: 정렬(확정 시각 동률이면 id 큰 순)은 쿼리(EnrollmentRepositoryTest)에 위임하고, 여기서는 반환된 대상만 강등하는지 확인한다. */

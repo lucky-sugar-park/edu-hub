@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 정원 감소 시 가장 늦게 확정된 사람부터 기존 대기자보다 앞선 대기로 내린다(D-03, D-24). 정원 증가 시에는 빈자리만큼 대기자를 승급한다(D-02, D-26).
+ * 정원이 바뀐 모든 경우에 마지막으로 빈자리를 채워, 감소 뒤에도 남은 빈자리와 대기자의 오래된 상태를 자기 복구한다.
  */
 @Component
 public class CapacityChangeEnrollmentHandler implements SessionCapacityChangeHandler {
@@ -32,14 +33,18 @@ public class CapacityChangeEnrollmentHandler implements SessionCapacityChangeHan
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void onCapacityChanged(CourseSession session, int oldCapacity, int newCapacity) {
-    if (newCapacity > oldCapacity) {
-      // 정원이 늘면 대기자를 앞에서부터 승급한다(D-02). 실제 승급 수는 VacancyFiller가 정한다.
-      vacancyFiller.fillVacancies(session, clock.instant());
-      return;
-    }
     if (newCapacity == oldCapacity) {
       return;
     }
+    if (newCapacity < oldCapacity) {
+      demoteExcess(session, newCapacity);
+    }
+    // 증가: 대기자를 앞에서부터 승급한다(D-02). 감소: 강등 뒤에도 남은 빈자리를 채운다(자기 복구).
+    // 실제 승급 수는 VacancyFiller가 정한다.
+    vacancyFiller.fillVacancies(session, clock.instant());
+  }
+
+  private void demoteExcess(CourseSession session, int newCapacity) {
     Long sessionId = session.getId();
     long confirmed =
         enrollmentRepository.countBySessionIdAndStatus(sessionId, EnrollmentStatus.CONFIRMED);

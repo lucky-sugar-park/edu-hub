@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -153,6 +155,25 @@ class EnrollmentCommandServiceTest {
     verify(enrollmentRepository).saveAndFlush(saved.capture());
     assertThat(saved.getValue().getStatus()).isEqualTo(EnrollmentStatus.WAITING);
     assertThat(response.status()).isEqualTo(EnrollmentStatus.WAITING);
+  }
+
+  /** SH1: 판정 전에 빈자리를 먼저 채운다(자기 복구). */
+  @Test
+  void enrollFillsVacanciesBeforeCountingForDecision() {
+    CourseSession session = givenOpenSession(10);
+    givenCounts(5, 0);
+    givenSaveReturnsArgument();
+
+    service.enroll(SESSION_ID, EMPLOYEE_ID);
+
+    InOrder order = inOrder(enrollmentRepository, vacancyFiller);
+    order
+        .verify(enrollmentRepository)
+        .existsBySessionIdAndEmployeeIdAndStatusIn(anyLong(), any(), any());
+    order.verify(vacancyFiller).fillVacancies(session, NOW);
+    order
+        .verify(enrollmentRepository)
+        .countBySessionIdAndStatus(SESSION_ID, EnrollmentStatus.CONFIRMED);
   }
 
   @Test
@@ -315,12 +336,13 @@ class EnrollmentCommandServiceTest {
     assertThat(enrollment.getCancelledAt()).isEqualTo(NOW);
     assertThat(response.status()).isEqualTo(EnrollmentStatus.CANCELLED);
     assertThat(response.waitingNumber()).isNull();
-    verify(enrollmentRepository).saveAndFlush(enrollment);
-    verify(vacancyFiller).fillVacancies(session, NOW);
+    InOrder order = inOrder(enrollmentRepository, vacancyFiller);
+    order.verify(enrollmentRepository).saveAndFlush(enrollment);
+    order.verify(vacancyFiller).fillVacancies(session, NOW);
   }
 
   @Test
-  void x2WaitingCancelDoesNotFillVacancies() {
+  void x2WaitingCancelAlsoFillsVacanciesForSelfHealing() {
     CourseSession session = givenOpenSession(10);
     Enrollment enrollment = givenActiveEnrollment(session, false);
 
@@ -329,7 +351,9 @@ class EnrollmentCommandServiceTest {
     assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.CANCELLED);
     assertThat(enrollment.getWaitingKey()).isNull();
     assertThat(response.status()).isEqualTo(EnrollmentStatus.CANCELLED);
-    verify(vacancyFiller, never()).fillVacancies(any(), any());
+    InOrder order = inOrder(enrollmentRepository, vacancyFiller);
+    order.verify(enrollmentRepository).saveAndFlush(enrollment);
+    order.verify(vacancyFiller).fillVacancies(session, NOW);
   }
 
   @Test
