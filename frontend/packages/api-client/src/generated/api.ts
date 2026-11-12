@@ -70,6 +70,7 @@ export interface EnrollmentResponse {
 export const EnrollmentResponseStatusEnum = {
     Confirmed: 'CONFIRMED',
     Waiting: 'WAITING',
+    Cancelled: 'CANCELLED',
 } as const;
 
 export type EnrollmentResponseStatusEnum = typeof EnrollmentResponseStatusEnum[keyof typeof EnrollmentResponseStatusEnum];
@@ -778,6 +779,46 @@ export class CourseAdminApi extends BaseAPI {
 export const EnrollmentApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
         /**
+         * 교육 시작 전까지만. 확정자가 취소하면 대기 1순위가 확정된다
+         * @summary 회차의 내 신청을 취소한다
+         * @param {number} sessionId 
+         * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        cancel: async (sessionId: number, xEmployeeId: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'sessionId' is not null or undefined
+            assertParamExists('cancel', 'sessionId', sessionId)
+            // verify required parameter 'xEmployeeId' is not null or undefined
+            assertParamExists('cancel', 'xEmployeeId', xEmployeeId)
+            const localVarPath = `/api/v1/sessions/{sessionId}/enrollments/me/cancel`
+                .replace('{sessionId}', encodeURIComponent(String(sessionId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            if (xEmployeeId != null) {
+                localVarHeaderParameter['X-Employee-Id'] = String(xEmployeeId);
+            }
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
          * 정원 안이고 대기자가 없으면 CONFIRMED, 아니면 WAITING으로 저장한다. WAITING이면 응답의 waitingNumber에 대기 순번이 있고 CONFIRMED면 null이다
          * @summary 회차에 수강 신청한다
          * @param {number} sessionId 
@@ -867,6 +908,20 @@ export const EnrollmentApiFp = function(configuration?: Configuration) {
     const localVarAxiosParamCreator = EnrollmentApiAxiosParamCreator(configuration)
     return {
         /**
+         * 교육 시작 전까지만. 확정자가 취소하면 대기 1순위가 확정된다
+         * @summary 회차의 내 신청을 취소한다
+         * @param {number} sessionId 
+         * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async cancel(sessionId: number, xEmployeeId: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<EnrollmentResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.cancel(sessionId, xEmployeeId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['EnrollmentApi.cancel']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
          * 정원 안이고 대기자가 없으면 CONFIRMED, 아니면 WAITING으로 저장한다. WAITING이면 응답의 waitingNumber에 대기 순번이 있고 CONFIRMED면 null이다
          * @summary 회차에 수강 신청한다
          * @param {number} sessionId 
@@ -904,6 +959,17 @@ export const EnrollmentApiFactory = function (configuration?: Configuration, bas
     const localVarFp = EnrollmentApiFp(configuration)
     return {
         /**
+         * 교육 시작 전까지만. 확정자가 취소하면 대기 1순위가 확정된다
+         * @summary 회차의 내 신청을 취소한다
+         * @param {number} sessionId 
+         * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        cancel(sessionId: number, xEmployeeId: string, options?: RawAxiosRequestConfig): AxiosPromise<EnrollmentResponse> {
+            return localVarFp.cancel(sessionId, xEmployeeId, options).then((request) => request(axios, basePath));
+        },
+        /**
          * 정원 안이고 대기자가 없으면 CONFIRMED, 아니면 WAITING으로 저장한다. WAITING이면 응답의 waitingNumber에 대기 순번이 있고 CONFIRMED면 null이다
          * @summary 회차에 수강 신청한다
          * @param {number} sessionId 
@@ -932,6 +998,18 @@ export const EnrollmentApiFactory = function (configuration?: Configuration, bas
  * EnrollmentApi - object-oriented interface
  */
 export class EnrollmentApi extends BaseAPI {
+    /**
+     * 교육 시작 전까지만. 확정자가 취소하면 대기 1순위가 확정된다
+     * @summary 회차의 내 신청을 취소한다
+     * @param {number} sessionId 
+     * @param {string} xEmployeeId 신청자 사번. 인증 도입 전 임시
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public cancel(sessionId: number, xEmployeeId: string, options?: RawAxiosRequestConfig) {
+        return EnrollmentApiFp(this.configuration).cancel(sessionId, xEmployeeId, options).then((request) => request(this.axios, this.basePath));
+    }
+
     /**
      * 정원 안이고 대기자가 없으면 CONFIRMED, 아니면 WAITING으로 저장한다. WAITING이면 응답의 waitingNumber에 대기 순번이 있고 CONFIRMED면 null이다
      * @summary 회차에 수강 신청한다
