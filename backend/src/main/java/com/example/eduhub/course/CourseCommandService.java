@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 관리자의 과정·회차 등록, 수정, 종료(FR-03). 조회는 {@link CourseQueryService}가 맡는다. */
@@ -16,13 +17,16 @@ public class CourseCommandService {
   private final CourseRepository courseRepository;
   private final CourseSessionRepository courseSessionRepository;
   private final SessionSeatCounter sessionSeatCounter;
+  private final SessionCapacityChangeHandler capacityChangeHandler;
   private final Clock clock;
 
   public CourseCommandService(
       CourseRepository courseRepository,
       CourseSessionRepository courseSessionRepository,
       SessionSeatCounter sessionSeatCounter,
+      SessionCapacityChangeHandler capacityChangeHandler,
       Clock clock) {
+    this.capacityChangeHandler = capacityChangeHandler;
     this.courseRepository = courseRepository;
     this.courseSessionRepository = courseSessionRepository;
     this.sessionSeatCounter = sessionSeatCounter;
@@ -61,10 +65,20 @@ public class CourseCommandService {
     return SessionResponse.of(session, 0);
   }
 
+  /** 회차 락을 첫 쿼리로 잡아 신청과 직렬화한다(D-20, D-24). */
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public SessionResponse updateSession(Long sessionId, SessionRequest request) {
-    CourseSession session = findSession(sessionId);
+    CourseSession session =
+        courseSessionRepository
+            .findByIdForUpdate(sessionId)
+            .orElseThrow(() -> new SessionNotFoundException(sessionId));
+    int oldCapacity = session.getCapacity();
     session.update(request.startAt(), request.place(), request.capacity(), now());
-    // TODO(3주차, FR-05): 정원이 바뀌면 D-02(대기자 승급), D-03(확정자 강등)을 여기서 이어 처리한다.
+    int newCapacity = session.getCapacity();
+    if (newCapacity != oldCapacity) {
+      // 감소 시 강등(D-03)은 핸들러가 처리한다. D-02 승급은 FR-06.
+      capacityChangeHandler.onCapacityChanged(session, oldCapacity, newCapacity);
+    }
     return toSessionResponse(session);
   }
 

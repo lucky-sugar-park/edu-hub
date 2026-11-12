@@ -79,6 +79,64 @@ class EnrollmentCommandServiceTest {
   }
 
   @Test
+  void w1FirstWaiterGetsKeyOneAndNumberOne() {
+    givenOpenSession(1);
+    givenCounts(1, 0);
+    given(enrollmentRepository.findMaxWaitingKey(SESSION_ID)).willReturn(Optional.empty());
+    given(
+            enrollmentRepository.countBySessionIdAndStatusAndWaitingKeyLessThan(
+                SESSION_ID, EnrollmentStatus.WAITING, 1L))
+        .willReturn(0L);
+    givenSaveReturnsArgument();
+
+    EnrollmentResponse response = service.enroll(SESSION_ID, EMPLOYEE_ID);
+
+    ArgumentCaptor<Enrollment> saved = ArgumentCaptor.forClass(Enrollment.class);
+    verify(enrollmentRepository).saveAndFlush(saved.capture());
+    assertThat(saved.getValue().getStatus()).isEqualTo(EnrollmentStatus.WAITING);
+    assertThat(saved.getValue().getWaitingKey()).isEqualTo(1L);
+    assertThat(saved.getValue().getConfirmedAt()).isNull();
+    assertThat(response.waitingNumber()).isEqualTo(1);
+  }
+
+  @Test
+  void w2WaiterGetsMaxKeyPlusOneAndNumberAfterThoseAhead() {
+    givenOpenSession(1);
+    givenCounts(1, 3);
+    given(enrollmentRepository.findMaxWaitingKey(SESSION_ID)).willReturn(Optional.of(5L));
+    given(
+            enrollmentRepository.countBySessionIdAndStatusAndWaitingKeyLessThan(
+                SESSION_ID, EnrollmentStatus.WAITING, 6L))
+        .willReturn(3L);
+    givenSaveReturnsArgument();
+
+    EnrollmentResponse response = service.enroll(SESSION_ID, EMPLOYEE_ID);
+
+    ArgumentCaptor<Enrollment> saved = ArgumentCaptor.forClass(Enrollment.class);
+    verify(enrollmentRepository).saveAndFlush(saved.capture());
+    assertThat(saved.getValue().getWaitingKey()).isEqualTo(6L);
+    assertThat(response.waitingNumber()).isEqualTo(4);
+  }
+
+  @Test
+  void w3ConfirmedHasNoWaitingNumberAndConfirmedAtIsNow() {
+    givenOpenSession(10);
+    givenConfirmedCount(0);
+    givenSaveReturnsArgument();
+
+    EnrollmentResponse response = service.enroll(SESSION_ID, EMPLOYEE_ID);
+
+    ArgumentCaptor<Enrollment> saved = ArgumentCaptor.forClass(Enrollment.class);
+    verify(enrollmentRepository).saveAndFlush(saved.capture());
+    assertThat(saved.getValue().getConfirmedAt()).isEqualTo(NOW);
+    assertThat(saved.getValue().getWaitingKey()).isNull();
+    assertThat(response.waitingNumber()).isNull();
+    verify(enrollmentRepository, never()).findMaxWaitingKey(anyLong());
+    verify(enrollmentRepository, never())
+        .countBySessionIdAndStatusAndWaitingKeyLessThan(anyLong(), any(), any());
+  }
+
+  @Test
   void s12WaitsWhenSeatsRemainButSomeoneIsWaiting() {
     givenOpenSession(2);
     givenCounts(1, 1);

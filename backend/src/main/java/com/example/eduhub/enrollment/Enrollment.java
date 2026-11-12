@@ -33,14 +33,46 @@ public class Enrollment {
 
   private Instant appliedAt;
 
+  /** 대기 순서 키. WAITING일 때만 값이 있고 작을수록 앞이다(D-23). */
+  private Long waitingKey;
+
+  /** 확정 시각. 정원 감소 시 가장 늦게 확정된 사람부터 강등하는 기준이다(D-03). */
+  private Instant confirmedAt;
+
   protected Enrollment() {}
 
-  public Enrollment(
-      CourseSession session, String employeeId, EnrollmentStatus status, Instant appliedAt) {
+  private Enrollment(
+      CourseSession session,
+      String employeeId,
+      EnrollmentStatus status,
+      Instant appliedAt,
+      Long waitingKey,
+      Instant confirmedAt) {
     this.session = session;
     this.employeeId = employeeId;
     this.status = status;
     this.appliedAt = appliedAt;
+    this.waitingKey = waitingKey;
+    this.confirmedAt = confirmedAt;
+  }
+
+  public static Enrollment confirmed(CourseSession session, String employeeId, Instant now) {
+    return new Enrollment(session, employeeId, EnrollmentStatus.CONFIRMED, now, null, now);
+  }
+
+  public static Enrollment waiting(
+      CourseSession session, String employeeId, Instant now, long waitingKey) {
+    return new Enrollment(session, employeeId, EnrollmentStatus.WAITING, now, waitingKey, null);
+  }
+
+  /** 정원 감소로 확정에서 대기로 내린다(D-03). */
+  public void demote(long waitingKey) {
+    if (status != EnrollmentStatus.CONFIRMED) {
+      throw new IllegalStateException("확정 상태만 대기로 내릴 수 있습니다: " + status);
+    }
+    this.status = EnrollmentStatus.WAITING;
+    this.confirmedAt = null;
+    this.waitingKey = waitingKey;
   }
 
   public Long getId() {
@@ -61,5 +93,13 @@ public class Enrollment {
 
   public Instant getAppliedAt() {
     return appliedAt;
+  }
+
+  public Long getWaitingKey() {
+    return waitingKey;
+  }
+
+  public Instant getConfirmedAt() {
+    return confirmedAt;
   }
 }

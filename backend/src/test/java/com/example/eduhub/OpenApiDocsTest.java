@@ -76,4 +76,18 @@ class OpenApiDocsTest {
         .andExpect(jsonPath(path + ".responses['409']").exists())
         .andExpect(jsonPath(path + ".responses['503']").exists());
   }
+
+  @Test
+  void apiDocsIncludeMyEnrollmentEndpointAndWaitingNumber() throws Exception {
+    String path = "$.paths['/api/v1/sessions/{sessionId}/enrollments/me'].get";
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(path).exists())
+        .andExpect(jsonPath(path + ".tags[0]").value("Enrollment"))
+        .andExpect(jsonPath(path + ".responses['200']").exists())
+        .andExpect(jsonPath(path + ".responses['404']").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.EnrollmentResponse.properties.waitingNumber").exists());
+  }
 }

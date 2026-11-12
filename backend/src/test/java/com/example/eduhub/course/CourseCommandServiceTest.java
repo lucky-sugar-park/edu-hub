@@ -3,6 +3,7 @@ package com.example.eduhub.course;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -35,6 +36,7 @@ class CourseCommandServiceTest {
   @Mock private CourseSessionRepository courseSessionRepository;
 
   @Mock private SessionSeatCounter sessionSeatCounter;
+  @Mock private SessionCapacityChangeHandler capacityChangeHandler;
 
   private CourseCommandService service;
 
@@ -45,6 +47,7 @@ class CourseCommandServiceTest {
             courseRepository,
             courseSessionRepository,
             sessionSeatCounter,
+            capacityChangeHandler,
             Clock.fixed(NOW, ZoneOffset.UTC));
   }
 
@@ -165,7 +168,7 @@ class CourseCommandServiceTest {
 
     @Test
     void updateSessionBeforeStartChangesAllFields() {
-      CourseSession session = givenSession(5L, FUTURE);
+      CourseSession session = givenLockedSession(5L, FUTURE);
       Instant later = FUTURE.plus(Duration.ofDays(1));
 
       SessionResponse response = service.updateSession(5L, new SessionRequest(later, "별관", 30));
@@ -177,7 +180,7 @@ class CourseCommandServiceTest {
 
     @Test
     void updateSessionReflectsConfirmedCountInRemainingSeats() {
-      CourseSession session = givenSession(5L, FUTURE);
+      CourseSession session = givenLockedSession(5L, FUTURE);
       ReflectionTestUtils.setField(session, "id", 5L);
       given(sessionSeatCounter.countConfirmedBySessionIds(List.of(5L))).willReturn(Map.of(5L, 4L));
 
@@ -189,15 +192,17 @@ class CourseCommandServiceTest {
 
     @Test
     void updateSessionBeforeStartRejectsPastStart() {
-      givenSession(5L, FUTURE);
+      givenLockedSession(5L, FUTURE);
 
       assertThatThrownBy(() -> service.updateSession(5L, new SessionRequest(PAST, "본사", 10)))
           .isInstanceOf(InvalidRequestException.class);
+
+      verify(capacityChangeHandler, never()).onCapacityChanged(any(), anyInt(), anyInt());
     }
 
     @Test
     void updateSessionAfterStartAllowsPlaceChange() {
-      CourseSession session = givenSession(5L, PAST);
+      CourseSession session = givenLockedSession(5L, PAST);
 
       service.updateSession(5L, new SessionRequest(PAST, "별관", 10));
 
@@ -206,41 +211,86 @@ class CourseCommandServiceTest {
 
     @Test
     void updateSessionAfterStartRejectsCapacityChange() {
-      CourseSession session = givenSession(5L, PAST);
+      CourseSession session = givenLockedSession(5L, PAST);
 
       assertConflict(
           () -> service.updateSession(5L, new SessionRequest(PAST, "본사", 11)), "SESSION_STARTED");
       assertThat(session.getCapacity()).isEqualTo(10);
+
+      verify(capacityChangeHandler, never()).onCapacityChanged(any(), anyInt(), anyInt());
     }
 
     @Test
     void updateSessionAfterStartRejectsStartChange() {
-      givenSession(5L, PAST);
+      givenLockedSession(5L, PAST);
 
       assertConflict(
           () -> service.updateSession(5L, new SessionRequest(FUTURE, "본사", 10)), "SESSION_STARTED");
+
+      verify(capacityChangeHandler, never()).onCapacityChanged(any(), anyInt(), anyInt());
     }
 
     @Test
     void updateSessionTreatsStartTimeAsStarted() {
-      givenSession(5L, NOW);
+      givenLockedSession(5L, NOW);
 
       assertConflict(
           () -> service.updateSession(5L, new SessionRequest(NOW, "본사", 11)), "SESSION_STARTED");
+
+      verify(capacityChangeHandler, never()).onCapacityChanged(any(), anyInt(), anyInt());
     }
 
     @Test
     void updateSessionFailsWhenClosed() {
-      CourseSession session = givenSession(5L, PAST);
+      CourseSession session = givenLockedSession(5L, PAST);
       session.close(NOW);
 
       assertConflict(
           () -> service.updateSession(5L, new SessionRequest(PAST, "별관", 10)), "SESSION_CLOSED");
+
+      verify(capacityChangeHandler, never()).onCapacityChanged(any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void updateSessionUsesLockedQueryNotPlainFindById() {
+      givenLockedSession(5L, FUTURE);
+
+      service.updateSession(5L, new SessionRequest(FUTURE, "본사", 10));
+
+      verify(courseSessionRepository).findByIdForUpdate(5L);
+      verify(courseSessionRepository, never()).findById(any());
+    }
+
+    @Test
+    void updateSessionCallsHandlerOnlyWhenCapacityChanges() {
+      CourseSession session = givenLockedSession(5L, FUTURE);
+
+      service.updateSession(5L, new SessionRequest(FUTURE, "본사", 6));
+
+      verify(capacityChangeHandler).onCapacityChanged(session, 10, 6);
+    }
+
+    @Test
+    void updateSessionCallsHandlerOnCapacityIncrease() {
+      CourseSession session = givenLockedSession(5L, FUTURE);
+
+      service.updateSession(5L, new SessionRequest(FUTURE, "본사", 12));
+
+      verify(capacityChangeHandler).onCapacityChanged(session, 10, 12);
+    }
+
+    @Test
+    void updateSessionDoesNotCallHandlerWhenOnlyPlaceChanges() {
+      givenLockedSession(5L, FUTURE);
+
+      service.updateSession(5L, new SessionRequest(FUTURE, "별관", 10));
+
+      verify(capacityChangeHandler, never()).onCapacityChanged(any(), anyInt(), anyInt());
     }
 
     @Test
     void updateSessionFailsWhenMissing() {
-      given(courseSessionRepository.findById(9L)).willReturn(Optional.empty());
+      given(courseSessionRepository.findByIdForUpdate(9L)).willReturn(Optional.empty());
 
       assertThatThrownBy(() -> service.updateSession(9L, new SessionRequest(FUTURE, "본사", 10)))
           .isInstanceOf(SessionNotFoundException.class);
@@ -294,6 +344,12 @@ class CourseCommandServiceTest {
   private CourseSession givenSession(Long id, Instant startAt) {
     CourseSession session = new CourseSession(new Course("JPA 입문", "개발", null), startAt, "본사", 10);
     given(courseSessionRepository.findById(id)).willReturn(Optional.of(session));
+    return session;
+  }
+
+  private CourseSession givenLockedSession(Long id, Instant startAt) {
+    CourseSession session = new CourseSession(new Course("JPA 입문", "개발", null), startAt, "본사", 10);
+    given(courseSessionRepository.findByIdForUpdate(id)).willReturn(Optional.of(session));
     return session;
   }
 

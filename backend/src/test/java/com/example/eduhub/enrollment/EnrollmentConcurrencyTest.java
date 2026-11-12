@@ -4,22 +4,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.eduhub.common.ConflictException;
 import com.example.eduhub.course.Course;
+import com.example.eduhub.course.CourseCommandService;
 import com.example.eduhub.course.CourseRepository;
 import com.example.eduhub.course.CourseSession;
 import com.example.eduhub.course.CourseSessionRepository;
+import com.example.eduhub.course.SessionRequest;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,6 +46,7 @@ class EnrollmentConcurrencyTest {
   private static final String DUPLICATE = "DUPLICATE_ENROLLMENT";
 
   @Autowired private EnrollmentCommandService enrollmentCommandService;
+  @Autowired private CourseCommandService courseCommandService;
   @Autowired private EnrollmentRepository enrollmentRepository;
   @Autowired private CourseRepository courseRepository;
   @Autowired private CourseSessionRepository courseSessionRepository;
@@ -150,6 +156,149 @@ class EnrollmentConcurrencyTest {
         .containsOnly(Map.entry("CONFIRMED", 10), Map.entry("WAITING", 90));
     assertThat(confirmedA).as("회차 A, 결과 분포 %s", distribution).isEqualTo(5);
     assertThat(confirmedB).as("회차 B, 결과 분포 %s", distribution).isEqualTo(5);
+  }
+
+  @Test
+  @DisplayName("C5: 정원 1에 서로 다른 100명이 동시에 신청하면 대기 순번은 1~99로 중복·빈틈이 없다")
+  void waitingNumbersAreUniqueAndContiguous() throws Exception {
+    Long sessionId = givenSession(givenCourse(), 1);
+
+    Queue<Integer> waitingNumbers = new ConcurrentLinkedQueue<>();
+    List<Callable<String>> tasks = new ArrayList<>();
+    for (int i = 0; i < 100; i++) {
+      String employeeId = "C5-" + i;
+      tasks.add(() -> {
+        try {
+          EnrollmentResponse response = enrollmentCommandService.enroll(sessionId, employeeId);
+          if (response.waitingNumber() != null) {
+            waitingNumbers.add(response.waitingNumber());
+          }
+          return response.status().name();
+        } catch (ConflictException exception) {
+          return exception.getCode();
+        } catch (Throwable throwable) {
+          return throwable.getClass().getName();
+        }
+      });
+    }
+    Map<String, Integer> distribution = runConcurrently(tasks);
+
+    List<Long> keysInDb =
+        jdbcTemplate.queryForList(
+            "SELECT waiting_key FROM enrollment WHERE session_id = ? AND status = 'WAITING'"
+                + " ORDER BY waiting_key",
+            Long.class,
+            sessionId);
+    List<Integer> sortedNumbers = waitingNumbers.stream().sorted().toList();
+    List<Integer> expected = IntStream.rangeClosed(1, 99).boxed().toList();
+    assertThat(distribution)
+        .as("결과 분포 %s, 응답 순번 %s, DB 대기 키 %s", distribution, sortedNumbers, keysInDb)
+        .containsOnly(Map.entry("CONFIRMED", 1), Map.entry("WAITING", 99));
+    assertThat(sortedNumbers)
+        .as("응답 waitingNumber(정렬) %s, 분포 %s", sortedNumbers, distribution)
+        .isEqualTo(expected);
+    assertThat(keysInDb)
+        .as("DB 대기 키 %s, 분포 %s", keysInDb, distribution)
+        .hasSize(99)
+        .doesNotHaveDuplicates();
+  }
+
+  @Test
+  @DisplayName("C6: 정원 감소와 신규 신청 50건이 섞여도 불변식 I1~I5가 성립하고 예외가 없다")
+  void capacityDecreaseMixedWithNewApplications() throws Exception {
+    Long sessionId = givenSession(givenCourse(), 10);
+    for (int i = 0; i < 10; i++) {
+      enrollmentCommandService.enroll(sessionId, "C6-PRE-" + i);
+    }
+    for (int i = 0; i < 5; i++) {
+      enrollmentCommandService.enroll(sessionId, "C6-OLD-" + i);
+    }
+    CourseSession session = courseSessionRepository.findById(sessionId).orElseThrow();
+    SessionRequest decrease = new SessionRequest(session.getStartAt(), session.getPlace(), 6);
+
+    // 정원 변경이 신청들 사이(처음 출발하는 32개 안)에 섞이도록 중간에 끼운다.
+    List<Callable<String>> tasks = new ArrayList<>();
+    for (int i = 0; i < 50; i++) {
+      if (i == 20) {
+        tasks.add(() -> {
+          try {
+            courseCommandService.updateSession(sessionId, decrease);
+            return "UPDATED";
+          } catch (Throwable throwable) {
+            return "UPDATE_" + throwable.getClass().getName();
+          }
+        });
+      }
+      tasks.add(enrollTask(sessionId, "C6-NEW-" + i));
+    }
+    Map<String, Integer> distribution = runConcurrently(tasks);
+
+    List<Map<String, Object>> rows =
+        jdbcTemplate.queryForList(
+            "SELECT employee_id, status, waiting_key FROM enrollment WHERE session_id = ?"
+                + " ORDER BY waiting_key, id",
+            sessionId);
+    List<String> confirmed = new ArrayList<>();
+    List<String> waitingOrder = new ArrayList<>();
+    List<Long> waitingKeys = new ArrayList<>();
+    int nonWaitingWithKey = 0;
+    for (Map<String, Object> row : rows) {
+      String status = (String) row.get("status");
+      Object key = row.get("waiting_key");
+      if ("CONFIRMED".equals(status)) {
+        confirmed.add((String) row.get("employee_id"));
+      }
+      if ("WAITING".equals(status)) {
+        waitingOrder.add((String) row.get("employee_id"));
+        waitingKeys.add(((Number) key).longValue());
+      } else if (key != null) {
+        nonWaitingWithKey++;
+      }
+    }
+    Integer capacityInDb =
+        jdbcTemplate.queryForObject(
+            "SELECT capacity FROM course_session WHERE id = ?", Integer.class, sessionId);
+    String state =
+        "분포 %s, 정원 %d, 확정 %s, 대기 순서 %s, 대기 키 %s"
+            .formatted(distribution, capacityInDb, confirmed, waitingOrder, waitingKeys);
+
+    // 예외 0건: 정원 변경 1건 성공 + 신규 신청 50건 모두 대기(확정 10 > 새 정원 6이므로 빈 자리가 없다).
+    assertThat(distribution)
+        .as(state)
+        .containsOnly(Map.entry("UPDATED", 1), Map.entry("WAITING", 50));
+    assertThat(capacityInDb).as(state).isEqualTo(6);
+    // I1: 확정 수는 정원 이하(정확히 앞 6명)
+    assertThat(confirmed.size()).as("I1 " + state).isLessThanOrEqualTo(6);
+    assertThat(confirmed)
+        .as("I1 확정 6명은 먼저 확정된 PRE-0..5 " + state)
+        .containsExactlyInAnyOrder(
+            "C6-PRE-0", "C6-PRE-1", "C6-PRE-2", "C6-PRE-3", "C6-PRE-4", "C6-PRE-5");
+    // I2: 대기 키 중복 없음, 비대기 행은 키 없음
+    assertThat(waitingKeys).as("I2 대기 키 중복 " + state).doesNotHaveDuplicates();
+    assertThat(nonWaitingWithKey).as("I2 비대기 행의 키 " + state).isZero();
+    // I3: 키 정렬 기준 순번이 1..N 연속(대기 59명 = 강등 4 + 기존 5 + 신규 50)
+    assertThat(waitingOrder).as("I3 대기 인원 " + state).hasSize(59);
+    // I4: 강등자 4명(확정 순)이 기존 대기자 5명(신청 순)보다 앞
+    assertThat(waitingOrder.subList(0, 9))
+        .as("I4 강등자 → 기존 대기자 순서 " + state)
+        .containsExactly(
+            "C6-PRE-6",
+            "C6-PRE-7",
+            "C6-PRE-8",
+            "C6-PRE-9",
+            "C6-OLD-0",
+            "C6-OLD-1",
+            "C6-OLD-2",
+            "C6-OLD-3",
+            "C6-OLD-4");
+    // I5: 신규 신청자 50명은 모두 기존 대기자 뒤
+    List<String> expectedNew = new ArrayList<>();
+    for (int i = 0; i < 50; i++) {
+      expectedNew.add("C6-NEW-" + i);
+    }
+    assertThat(waitingOrder.subList(9, 59))
+        .as("I5 신규 신청자는 모두 맨 뒤 " + state)
+        .containsExactlyInAnyOrderElementsOf(expectedNew);
   }
 
   private Long givenCourse() {

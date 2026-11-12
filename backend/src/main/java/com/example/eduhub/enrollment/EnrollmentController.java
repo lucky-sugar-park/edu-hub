@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -27,14 +28,23 @@ import org.springframework.web.bind.annotation.RestController;
 public class EnrollmentController {
 
   private final EnrollmentCommandService enrollmentCommandService;
+  private final EnrollmentQueryService enrollmentQueryService;
 
-  public EnrollmentController(EnrollmentCommandService enrollmentCommandService) {
+  public EnrollmentController(
+      EnrollmentCommandService enrollmentCommandService,
+      EnrollmentQueryService enrollmentQueryService) {
     this.enrollmentCommandService = enrollmentCommandService;
+    this.enrollmentQueryService = enrollmentQueryService;
   }
 
   // TODO(NFR-03): 인증 도입 후 로그인 사용자에서 사번을 꺼내고 헤더를 없앤다
-  @Operation(summary = "회차에 수강 신청한다", description = "정원 안이면 CONFIRMED, 정원이 찼으면 WAITING으로 저장한다")
-  @ApiResponse(responseCode = "201", description = "신청 성공(CONFIRMED 또는 WAITING)")
+  @Operation(
+      summary = "회차에 수강 신청한다",
+      description =
+          "정원 안이고 대기자가 없으면 CONFIRMED, 아니면 WAITING으로 저장한다. WAITING이면 응답의 waitingNumber에 대기 순번이 있고 CONFIRMED면 null이다")
+  @ApiResponse(
+      responseCode = "201",
+      description = "신청 성공(CONFIRMED 또는 WAITING). WAITING이면 waitingNumber 포함")
   @ApiResponse(
       responseCode = "400",
       description = "사번 헤더 누락·공백·20자 초과, 또는 회차 id가 숫자가 아님",
@@ -63,5 +73,29 @@ public class EnrollmentController {
           @Size(max = 20)
           String employeeId) {
     return enrollmentCommandService.enroll(sessionId, employeeId);
+  }
+
+  // TODO(NFR-03): 인증 도입 후 로그인 사용자에서 사번을 꺼내고 헤더를 없앤다
+  @Operation(
+      summary = "회차의 내 신청과 대기 순번을 조회한다",
+      description = "그 회차의 활성 신청(CONFIRMED 또는 WAITING)을 돌려준다. WAITING이면 현재 waitingNumber가 있다")
+  @ApiResponse(responseCode = "200", description = "내 활성 신청과 대기 순번")
+  @ApiResponse(
+      responseCode = "400",
+      description = "사번 헤더 누락·공백·20자 초과, 또는 회차 id가 숫자가 아님",
+      content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description = "회차가 없거나, 그 회차에 내 활성 신청이 없음",
+      content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  @GetMapping("/api/v1/sessions/{sessionId}/enrollments/me")
+  public EnrollmentResponse getMyEnrollment(
+      @PathVariable Long sessionId,
+      @Parameter(description = "신청자 사번. 인증 도입 전 임시")
+          @RequestHeader("X-Employee-Id")
+          @NotBlank
+          @Size(max = 20)
+          String employeeId) {
+    return enrollmentQueryService.getMyEnrollment(sessionId, employeeId);
   }
 }

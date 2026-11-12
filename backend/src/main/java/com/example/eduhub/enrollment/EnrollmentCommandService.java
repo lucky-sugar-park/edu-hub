@@ -57,13 +57,27 @@ public class EnrollmentCommandService {
     long waiting =
         enrollmentRepository.countBySessionIdAndStatus(sessionId, EnrollmentStatus.WAITING);
     // D-21: 정원이 남아도 대기자가 있으면 앞지르지 못하고 대기한다.
-    EnrollmentStatus status =
-        confirmed < session.getCapacity() && waiting == 0
-            ? EnrollmentStatus.CONFIRMED
-            : EnrollmentStatus.WAITING;
-    // TODO(3주차, FR-05): WAITING 저장 시 대기 순번을 부여한다.
-    Enrollment saved = save(new Enrollment(session, employeeId, status, now), sessionId);
-    return EnrollmentResponse.from(saved);
+    Enrollment enrollment;
+    if (confirmed < session.getCapacity() && waiting == 0) {
+      enrollment = Enrollment.confirmed(session, employeeId, now);
+    } else {
+      // D-23: 새 대기자는 회차 락 안에서 키 최댓값 + 1을 받는다(D-05).
+      long waitingKey = enrollmentRepository.findMaxWaitingKey(sessionId).orElse(0L) + 1;
+      enrollment = Enrollment.waiting(session, employeeId, now, waitingKey);
+    }
+    Enrollment saved = save(enrollment, sessionId);
+    return EnrollmentResponse.of(saved, waitingNumberOf(saved, sessionId));
+  }
+
+  /** 회차 락 안에서 계산한다. 순번 = 나보다 앞선 대기자 수 + 1. 확정이면 null. */
+  private Integer waitingNumberOf(Enrollment saved, Long sessionId) {
+    if (saved.getStatus() != EnrollmentStatus.WAITING) {
+      return null;
+    }
+    long ahead =
+        enrollmentRepository.countBySessionIdAndStatusAndWaitingKeyLessThan(
+            sessionId, EnrollmentStatus.WAITING, saved.getWaitingKey());
+    return Math.toIntExact(ahead + 1);
   }
 
   private Enrollment save(Enrollment enrollment, Long sessionId) {
