@@ -38,3 +38,7 @@ desktop.ini
 .env
 .env.local
 .env.*.local
+
+# Claude Code (공유 설정은 커밋하고, 개인 설정과 워크트리는 제외한다)
+.claude/worktrees/
+.claude/settings.local.json

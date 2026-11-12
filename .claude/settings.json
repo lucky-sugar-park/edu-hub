@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew test)",
+      "Bash(./gradlew test *)",
+      "Bash(./gradlew spotlessApply)",
+      "Bash(./gradlew build)",
+      "Bash(npm test *)",
+      "Bash(npm run lint)",
+      "Bash(npm run generate:api)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(docker *)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./backend/src/main/resources/application-prod.yml)",
+      "Bash(git push --force*)",
+      "Bash(git push * --force*)",
+      "Bash(./gradlew flywayClean*)",
+      "Bash(ssh *)",
+      "Bash(psql *)"
+    ]
+  }
+}
