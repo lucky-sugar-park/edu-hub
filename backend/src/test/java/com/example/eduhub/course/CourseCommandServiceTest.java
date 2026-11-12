@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class CourseCommandServiceTest {
@@ -32,13 +34,18 @@ class CourseCommandServiceTest {
   @Mock private CourseRepository courseRepository;
   @Mock private CourseSessionRepository courseSessionRepository;
 
+  @Mock private SessionSeatCounter sessionSeatCounter;
+
   private CourseCommandService service;
 
   @BeforeEach
   void setUp() {
     service =
         new CourseCommandService(
-            courseRepository, courseSessionRepository, Clock.fixed(NOW, ZoneOffset.UTC));
+            courseRepository,
+            courseSessionRepository,
+            sessionSeatCounter,
+            Clock.fixed(NOW, ZoneOffset.UTC));
   }
 
   @Nested
@@ -166,6 +173,18 @@ class CourseCommandServiceTest {
       assertThat(response.startAt()).isEqualTo(later);
       assertThat(response.place()).isEqualTo("별관");
       assertThat(session.getCapacity()).isEqualTo(30);
+    }
+
+    @Test
+    void updateSessionReflectsConfirmedCountInRemainingSeats() {
+      CourseSession session = givenSession(5L, FUTURE);
+      ReflectionTestUtils.setField(session, "id", 5L);
+      given(sessionSeatCounter.countConfirmedBySessionIds(List.of(5L))).willReturn(Map.of(5L, 4L));
+
+      SessionResponse response = service.updateSession(5L, new SessionRequest(FUTURE, "본사", 10));
+
+      assertThat(response.capacity()).isEqualTo(10);
+      assertThat(response.remainingSeats()).isEqualTo(6);
     }
 
     @Test

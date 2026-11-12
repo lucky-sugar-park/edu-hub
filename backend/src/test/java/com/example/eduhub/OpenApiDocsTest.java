@@ -63,4 +63,17 @@ class OpenApiDocsTest {
                 .exists())
         .andExpect(jsonPath("$.components.schemas.SessionRequest.required").isArray());
   }
+
+  @Test
+  void apiDocsIncludeEnrollmentEndpoint() throws Exception {
+    String path = "$.paths['/api/v1/sessions/{sessionId}/enrollments'].post";
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(path + ".tags[0]").value("Enrollment"))
+        .andExpect(jsonPath(path + ".responses['201']").exists())
+        .andExpect(jsonPath(path + ".responses['404']").exists())
+        .andExpect(jsonPath(path + ".responses['409']").exists())
+        .andExpect(jsonPath(path + ".responses['503']").exists());
+  }
 }

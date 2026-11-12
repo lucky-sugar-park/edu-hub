@@ -79,6 +79,14 @@ public class CourseSession {
     this.status = CourseSessionStatus.CLOSED;
   }
 
+  /** 신청 가능한 회차인지 검사한다. 종료 여부를 먼저, 교육 시작 여부를 다음에 본다(D-08). */
+  public void ensureEnrollable(Instant now) {
+    ensureOpen();
+    if (hasStarted(now)) {
+      throw new ConflictException("SESSION_STARTED", "교육이 시작된 회차에는 신청할 수 없습니다: " + id);
+    }
+  }
+
   private void ensureOpen() {
     if (status == CourseSessionStatus.CLOSED) {
       throw new ConflictException("SESSION_CLOSED", "종료된 회차입니다: " + id);

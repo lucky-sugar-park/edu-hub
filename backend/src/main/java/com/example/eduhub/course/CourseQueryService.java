@@ -1,6 +1,7 @@
 package com.example.eduhub.course;
 
 import com.example.eduhub.common.PageResponse;
+import java.util.List;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -16,10 +17,15 @@ public class CourseQueryService {
   private final CourseRepository courseRepository;
   private final CourseSessionRepository courseSessionRepository;
 
+  private final SessionSeatCounter sessionSeatCounter;
+
   public CourseQueryService(
-      CourseRepository courseRepository, CourseSessionRepository courseSessionRepository) {
+      CourseRepository courseRepository,
+      CourseSessionRepository courseSessionRepository,
+      SessionSeatCounter sessionSeatCounter) {
     this.courseRepository = courseRepository;
     this.courseSessionRepository = courseSessionRepository;
+    this.sessionSeatCounter = sessionSeatCounter;
   }
 
   public PageResponse<CourseSummaryResponse> searchCourses(
@@ -33,7 +39,9 @@ public class CourseQueryService {
   public CourseDetailResponse getCourse(Long id) {
     Course course =
         courseRepository.findById(id).orElseThrow(() -> new CourseNotFoundException(id));
+    List<CourseSession> sessions = courseSessionRepository.findByCourseIdOrderByStartAtAscIdAsc(id);
+    List<Long> sessionIds = sessions.stream().map(CourseSession::getId).toList();
     return CourseDetailResponse.of(
-        course, courseSessionRepository.findByCourseIdOrderByStartAtAscIdAsc(id));
+        course, sessions, sessionSeatCounter.countConfirmedBySessionIds(sessionIds));
   }
 }

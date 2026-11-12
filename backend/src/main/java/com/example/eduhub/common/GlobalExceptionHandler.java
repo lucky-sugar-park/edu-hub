@@ -2,6 +2,7 @@ package com.example.eduhub.common;
 
 import java.util.Comparator;
 import java.util.stream.Collectors;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -32,6 +33,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   public ResponseEntity<ErrorResponse> handleInvalidRequest(InvalidRequestException exception) {
     return ResponseEntity.badRequest()
         .body(new ErrorResponse(HttpStatus.BAD_REQUEST.name(), exception.getMessage()));
+  }
+
+  /** 회차 락을 기다리다 시간이 지났다. 재시도할 수 있다. */
+  @ExceptionHandler(PessimisticLockingFailureException.class)
+  public ResponseEntity<ErrorResponse> handleLockTimeout(
+      PessimisticLockingFailureException exception) {
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+        .body(new ErrorResponse("LOCK_TIMEOUT", "요청이 몰려 처리하지 못했습니다. 잠시 후 다시 시도해 주세요"));
   }
 
   /** 요청 본문 검증 실패는 "필드: 메시지"를 필드 이름 순으로 이어 붙여 돌려준다. */

@@ -10,14 +10,14 @@ public record SessionResponse(
     int remainingSeats,
     CourseSessionStatus status) {
 
-  public static SessionResponse from(CourseSession session) {
-    // 수강 신청 구현 전까지 남은 자리는 정원과 같다.
+  /** 남은 자리는 {@code 정원 - 확정 수}이며 0 미만이 되지 않는다(D-22). */
+  public static SessionResponse of(CourseSession session, long confirmed) {
     return new SessionResponse(
         session.getId(),
         session.getStartAt(),
         session.getPlace(),
         session.getCapacity(),
-        session.getCapacity(),
+        (int) Math.max(0, session.getCapacity() - confirmed),
         session.getStatus());
   }
 }

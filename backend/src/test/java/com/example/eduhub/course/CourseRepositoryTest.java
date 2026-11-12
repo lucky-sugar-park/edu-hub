@@ -185,6 +185,21 @@ class CourseRepositoryTest {
         .isEqualTo(CourseSessionStatus.CLOSED);
   }
 
+  @Test
+  void findsSessionForUpdateById() {
+    Course course = saveCourse("JPA 입문", "개발");
+    CourseSession session =
+        entityManager.persistAndFlush(
+            new CourseSession(course, Instant.parse("2026-12-01T01:00:00Z"), "본사 3층", 20));
+    entityManager.clear();
+
+    assertThat(courseSessionRepository.findByIdForUpdate(session.getId()))
+        .get()
+        .extracting(CourseSession::getId)
+        .isEqualTo(session.getId());
+    assertThat(courseSessionRepository.findByIdForUpdate(session.getId() + 1000)).isEmpty();
+  }
+
   private Course saveCourse(String title, String category) {
     return courseRepository.saveAndFlush(new Course(title, category, null));
   }
