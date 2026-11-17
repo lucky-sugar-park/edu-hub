@@ -30,7 +30,8 @@ xml_failures=$(find backend/build/test-results/test -name 'TEST-*.xml' -newer "$
   xargs -r grep -h -B1 '<failure message=' 2>/dev/null |
   sed -n -e 's/.*<testcase name="\([^"]*\)" classname="\([^"]*\)".*/\2 > \1 FAILED/p' \
     -e 's/.*<failure message="\([^"]*\)".*/    \1/p' |
-  sed -e 's/&quot;/"/g' -e 's/&lt;/</g' -e 's/&gt;/>/g' -e "s/&apos;/'/g" -e 's/&amp;/\&/g')
+  sed -e 's/&#13;//g' -e 's/&#10;/ /g' \
+    -e 's/&quot;/"/g' -e 's/&lt;/</g' -e 's/&gt;/>/g' -e "s/&apos;/'/g" -e 's/&amp;/\&/g')
 rm -f "$marker"
 
 failures=$(printf '%s\n%s\n' "$xml_failures" "$(printf '%s\n' "$output" | grep -E 'FAILED|Exception')" |
