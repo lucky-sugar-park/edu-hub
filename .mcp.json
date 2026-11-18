@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "eduhub-db": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@benborla29/mcp-server-mysql"],
+      "env": {
+        "MYSQL_HOST": "127.0.0.1",
+        "MYSQL_PORT": "3306",
+        "MYSQL_USER": "${EDUHUB_DB_RO_USER}",
+        "MYSQL_PASS": "${EDUHUB_DB_RO_PASSWORD}",
+        "MYSQL_DB": "eduhub"
+      }
+    }
+  }
+}
