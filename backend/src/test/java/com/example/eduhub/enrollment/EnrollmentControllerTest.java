@@ -1,6 +1,10 @@
 package com.example.eduhub.enrollment;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -10,12 +14,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.eduhub.common.ConflictException;
+import com.example.eduhub.common.PageResponse;
 import com.example.eduhub.course.SessionNotFoundException;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -33,6 +41,95 @@ class EnrollmentControllerTest {
 
   @MockitoBean private EnrollmentCommandService enrollmentCommandService;
   @MockitoBean private EnrollmentQueryService enrollmentQueryService;
+
+  private static final String MY_LIST_URL = "/api/v1/me/enrollments";
+
+  private static PageResponse<MyEnrollmentResponse> myPage() {
+    return new PageResponse<>(
+        List.of(
+            new MyEnrollmentResponse(
+                7L,
+                "JPA 입문",
+                3L,
+                Instant.parse("2026-12-01T01:00:00Z"),
+                "본사 3층",
+                EnrollmentStatus.WAITING,
+                2,
+                Instant.parse("2026-11-12T01:00:00Z"))),
+        0,
+        20,
+        1);
+  }
+
+  @Test
+  void myEnrollmentsReturnsPageAndPassesNullStatus() throws Exception {
+    given(enrollmentQueryService.getMyEnrollments(eq("E1001"), isNull(), any()))
+        .willReturn(myPage());
+
+    mockMvc
+        .perform(get(MY_LIST_URL).header(HEADER, "E1001"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].courseTitle").value("JPA 입문"))
+        .andExpect(jsonPath("$.content[0].waitingNumber").value(2))
+        .andExpect(jsonPath("$.content[0].status").value("WAITING"))
+        .andExpect(jsonPath("$.totalElements").value(1));
+    ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+    verify(enrollmentQueryService).getMyEnrollments(eq("E1001"), isNull(), pageable.capture());
+    assertThat(pageable.getValue().getPageNumber()).isZero();
+    assertThat(pageable.getValue().getPageSize()).isEqualTo(20);
+  }
+
+  @Test
+  void myEnrollmentsCapsPageSizeAtMax() throws Exception {
+    given(enrollmentQueryService.getMyEnrollments(eq("E1001"), isNull(), any()))
+        .willReturn(myPage());
+
+    mockMvc
+        .perform(get(MY_LIST_URL).param("size", "100000").header(HEADER, "E1001"))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+    verify(enrollmentQueryService).getMyEnrollments(eq("E1001"), isNull(), pageable.capture());
+    assertThat(pageable.getValue().getPageSize()).isEqualTo(100);
+  }
+
+  @Test
+  void myEnrollmentsPassesStatusAsEnum() throws Exception {
+    given(enrollmentQueryService.getMyEnrollments(eq("E1001"), eq(EnrollmentStatus.WAITING), any()))
+        .willReturn(myPage());
+
+    mockMvc
+        .perform(get(MY_LIST_URL).param("status", "WAITING").header(HEADER, "E1001"))
+        .andExpect(status().isOk());
+    verify(enrollmentQueryService)
+        .getMyEnrollments(eq("E1001"), eq(EnrollmentStatus.WAITING), any());
+  }
+
+  @Test
+  void myEnrollmentsRejectsMissingBlankAndTooLongHeader() throws Exception {
+    mockMvc
+        .perform(get(MY_LIST_URL))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+    mockMvc
+        .perform(get(MY_LIST_URL).header(HEADER, "   "))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+    mockMvc
+        .perform(get(MY_LIST_URL).header(HEADER, "A".repeat(21)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+    verifyNoInteractions(enrollmentQueryService);
+  }
+
+  @Test
+  void myEnrollmentsRejectsUnknownStatus() throws Exception {
+    mockMvc
+        .perform(get(MY_LIST_URL).param("status", "UNKNOWN").header(HEADER, "E1001"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+    verifyNoInteractions(enrollmentQueryService);
+  }
 
   @Test
   void enrollReturnsCreated() throws Exception {

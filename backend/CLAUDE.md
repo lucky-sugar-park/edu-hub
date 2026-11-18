@@ -38,7 +38,7 @@
 - 문서는 springdoc 기본 경로인 `/v3/api-docs`와 `/swagger-ui.html`에서 제공된다.
 - 에러 응답은 `common/ErrorResponse`(`code`, `message`) 형식이며, `common/GlobalExceptionHandler`에서 처리한다.
   - 404: `NotFoundException` 하위 클래스(`CourseNotFoundException`, `SessionNotFoundException`, `EnrollmentNotFoundException` 등), code `NOT_FOUND`.
-  - 400: 요청 본문 검증 실패는 code `BAD_REQUEST`, message `필드: 메시지, ...`(필드 이름 순). Bean Validation 메시지는 한국어로 직접 적는다. 그 밖의 입력 오류는 `InvalidRequestException`.
+  - 400: 요청 본문 검증 실패는 code `BAD_REQUEST`, message `필드: 메시지, ...`(필드 이름 순). Bean Validation 메시지는 한국어로 직접 적는다. 그 밖의 입력 오류는 `InvalidRequestException`(사번 헤더 오류를 내는 `common/CurrentEmployeeArgumentResolver` 포함).
   - 409: `ConflictException(code, message)`. code는 `COURSE_CLOSED`, `SESSION_CLOSED`, `SESSION_STARTED`, `SESSION_NOT_STARTED`, `DUPLICATE_ENROLLMENT`(같은 회차 활성 신청 중복)처럼 상황별로 둔다.
   - 503: `PessimisticLockingFailureException`(회차 행 락 대기 3초 초과), code `LOCK_TIMEOUT`(D-20).
 
@@ -54,6 +54,8 @@
 - 취소 후 재신청이 가능하므로(D-05), 중복 신청 방지에 `회차+사용자` 일반 유니크 제약을 쓸 수 없다. MariaDB에는 부분 인덱스도 없으므로 생성 컬럼 `active_session_id`에 유일 제약을 건다(D-19).
 - 신청 동시성은 회차 행 `PESSIMISTIC_WRITE`를 첫 쿼리로 잡고 격리 수준은 `READ_COMMITTED`로 한다(D-20). 수량을 바꾸는 코드는 같은 락을 쓴다. 관리자 `updateSession`·`closeSession`과 신청 취소(`cancel`)도 회차 행 락을 첫 쿼리로 잡고 `READ_COMMITTED`로 실행한다(D-24, D-26).
 - 대기 순서는 `waiting_key`(작을수록 앞, 회차 안에서 유일)로 표현하고, 순번은 조회할 때 "키가 더 작은 대기자 수 + 1"로 계산한다. 새 대기자는 최댓값 + 1, 정원 감소로 강등된 사람은 기존 대기자보다 앞 순번(D-03)이 되도록 최솟값보다 작은 키를 받는다. 대기에서 벗어나면 키를 지운다(D-23).
+- 로그인한 사원의 사번은 컨트롤러 파라미터 `@CurrentEmployee String employeeId`로 받는다(D-27). 리졸버가 지금은 임시 헤더 `X-Employee-Id`를 읽으므로 위조 위험(W2)이 남는다. springdoc이 리졸버 파라미터를 헤더로 인식하지 못하므로 파라미터에는 `@Parameter(hidden = true)`를, 메서드에는 헤더 `@Parameter(in = HEADER)`를 붙인다. 기존 신청·내 신청·취소 엔드포인트는 아직 `@RequestHeader`이며 인증 도입 때 함께 바꾼다.
+- 목록 조회에서 대기 순번이 필요하면 행마다 `WaitingNumbers.numberOf()`를 부르지 말고, `EnrollmentRepository.findMyEnrollments`처럼 같은 쿼리 안의 서브쿼리로 계산한다(N+1 방지).
 - 신청 취소는 행을 지우지 않고 `CANCELLED`와 `cancelled_at`을 남기며, 교육 시작 후에는 확정·대기 모두 취소할 수 없다(409 `SESSION_STARTED`, D-25).
 - 빈자리 채우기(D-26)는 교육 시작 전에만 하고, 대기 키 오름차순으로 빈자리만큼 승급한다. 확정자 취소와 정원 증가(D-02)가 같은 규칙(`enrollment/VacancyFiller`)을 쓰고, 대기자 취소는 승급이 없다. `VacancyFiller`는 `Propagation.MANDATORY`라 트랜잭션 밖에서 부르면 예외가 나며, 회차 행 락은 호출자가 먼저 잡아야 한다.
 

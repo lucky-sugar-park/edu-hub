@@ -97,6 +97,31 @@ class OpenApiDocsTest {
   }
 
   @Test
+  void apiDocsIncludeMyEnrollmentsListWithSingleRequiredHeader() throws Exception {
+    String path = "$.paths['/api/v1/me/enrollments'].get";
+    String params = path + ".parameters";
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(path + ".summary").exists())
+        .andExpect(jsonPath(path + ".responses['200']").exists())
+        .andExpect(jsonPath(path + ".responses['400']").exists())
+        .andExpect(
+            jsonPath(params + "[?(@.name=='X-Employee-Id' && @.in=='header')].required")
+                .value(org.hamcrest.Matchers.contains(true)))
+        .andExpect(
+            jsonPath(params + "[?(@.name=='X-Employee-Id')]")
+                .value(org.hamcrest.Matchers.hasSize(1)))
+        .andExpect(
+            jsonPath(params + "[?(@.name=='employeeId')]").value(org.hamcrest.Matchers.empty()))
+        .andExpect(
+            jsonPath(params + "[?(@.name=='pageable')]").value(org.hamcrest.Matchers.empty()))
+        .andExpect(jsonPath(params + "[?(@.name=='sort')]").value(org.hamcrest.Matchers.empty()))
+        .andExpect(
+            jsonPath(params + "[?(@.name=='status')]").value(org.hamcrest.Matchers.hasSize(1)));
+  }
+
+  @Test
   void apiDocsIncludeCancelEndpointAndCancelledStatus() throws Exception {
     String path = "$.paths['/api/v1/sessions/{sessionId}/enrollments/me/cancel'].post";
     mockMvc
