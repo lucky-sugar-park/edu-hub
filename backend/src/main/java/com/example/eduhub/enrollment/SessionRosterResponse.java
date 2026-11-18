@@ -4,9 +4,16 @@ import com.example.eduhub.course.CourseSessionStatus;
 import java.time.Instant;
 import java.util.List;
 
-/** 회차 명단(FR-08). 확정·수료자와 대기자를 나눠 담는다. 취소자는 넣지 않는다. */
+/**
+ * 회차 명단(FR-08). 확정·수료자와 대기자를 나눠 담는다. 취소자는 넣지 않는다. 과정·회차 정보({@code courseId}, {@code courseTitle},
+ * {@code startAt}, {@code place})는 명단 화면을 주소로 바로 열어도 회차를 알아볼 수 있게 한다.
+ */
 public record SessionRosterResponse(
     Long sessionId,
+    Long courseId,
+    String courseTitle,
+    Instant startAt,
+    String place,
     int capacity,
     CourseSessionStatus sessionStatus,
     List<ConfirmedEntry> confirmed,

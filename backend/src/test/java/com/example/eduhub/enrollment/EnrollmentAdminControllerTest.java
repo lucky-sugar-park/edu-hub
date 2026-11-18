@@ -68,6 +68,10 @@ class EnrollmentAdminControllerTest {
         .willReturn(
             new SessionRosterResponse(
                 3L,
+                5L,
+                "JPA 입문",
+                T0,
+                "본사 3층",
                 10,
                 CourseSessionStatus.CLOSED,
                 List.of(
@@ -81,6 +85,10 @@ class EnrollmentAdminControllerTest {
         .perform(get(ROSTER_URL).with(ADMIN))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.sessionId").value(3))
+        .andExpect(jsonPath("$.courseId").value(5))
+        .andExpect(jsonPath("$.courseTitle").value("JPA 입문"))
+        .andExpect(jsonPath("$.startAt").value("2026-11-12T01:00:00Z"))
+        .andExpect(jsonPath("$.place").value("본사 3층"))
         .andExpect(jsonPath("$.capacity").value(10))
         .andExpect(jsonPath("$.sessionStatus").value("CLOSED"))
         .andExpect(jsonPath("$.confirmed[0].enrollmentId").value(1))

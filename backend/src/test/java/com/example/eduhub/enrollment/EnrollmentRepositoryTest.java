@@ -507,6 +507,7 @@ class EnrollmentRepositoryTest {
     assertThat(page.getTotalElements()).isEqualTo(3);
     MyEnrollmentRow first = page.getContent().get(0);
     assertThat(first.courseTitle()).isEqualTo("JPA 입문");
+    assertThat(first.courseId()).isEqualTo(course.getId());
     assertThat(first.sessionId()).isEqualTo(s3.getId());
     assertThat(first.sessionStartAt()).isEqualTo(START_AT);
     assertThat(first.sessionPlace()).isEqualTo("본사 3층");

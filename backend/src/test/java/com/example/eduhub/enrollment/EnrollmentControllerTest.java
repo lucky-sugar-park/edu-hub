@@ -51,6 +51,7 @@ class EnrollmentControllerTest {
         List.of(
             new MyEnrollmentResponse(
                 7L,
+                5L,
                 "JPA 입문",
                 3L,
                 Instant.parse("2026-12-01T01:00:00Z"),
@@ -71,6 +72,7 @@ class EnrollmentControllerTest {
     mockMvc
         .perform(get(MY_LIST_URL).with(employee("E1001")))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].courseId").value(5))
         .andExpect(jsonPath("$.content[0].courseTitle").value("JPA 입문"))
         .andExpect(jsonPath("$.content[0].waitingNumber").value(2))
         .andExpect(jsonPath("$.content[0].status").value("WAITING"))

@@ -5,6 +5,7 @@ import java.time.Instant;
 /** 조회 쿼리의 결과 행. 서브쿼리 count가 Long이라 순번만 Long으로 받는다. */
 record MyEnrollmentRow(
     Long id,
+    Long courseId,
     String courseTitle,
     Long sessionId,
     Instant sessionStartAt,
@@ -16,6 +17,7 @@ record MyEnrollmentRow(
   MyEnrollmentResponse toResponse() {
     return new MyEnrollmentResponse(
         id,
+        courseId,
         courseTitle,
         sessionId,
         sessionStartAt,

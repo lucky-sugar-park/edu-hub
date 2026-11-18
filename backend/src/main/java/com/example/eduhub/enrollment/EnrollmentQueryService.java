@@ -48,12 +48,13 @@ public class EnrollmentQueryService {
   }
 
   /**
-   * 회차 명단(FR-08). 쿼리는 회차 1 + 신청 1이다. 확정·수료는 확정 시각, id 오름차순이고 대기는 키 오름차순에 순번 1..n이다. 정렬은 서비스에서 한다.
+   * 회차 명단(FR-08). 쿼리는 회차(과정 fetch join) 1 + 신청 1이다. 확정·수료는 확정 시각, id 오름차순이고 대기는 키 오름차순에 순번 1..n이다.
+   * 정렬은 서비스에서 한다.
    */
   public SessionRosterResponse getRoster(Long sessionId) {
     CourseSession session =
         courseSessionRepository
-            .findById(sessionId)
+            .findByIdWithCourse(sessionId)
             .orElseThrow(() -> new SessionNotFoundException(sessionId));
     List<Enrollment> rows =
         enrollmentRepository.findBySessionIdAndStatusIn(sessionId, ROSTER_STATUSES);
@@ -92,7 +93,15 @@ public class EnrollmentQueryService {
               e.getId(), e.getEmployeeId(), i + 1, e.getAppliedAt()));
     }
     return new SessionRosterResponse(
-        session.getId(), session.getCapacity(), session.getStatus(), confirmed, waiting);
+        session.getId(),
+        session.getCourse().getId(),
+        session.getCourse().getTitle(),
+        session.getStartAt(),
+        session.getPlace(),
+        session.getCapacity(),
+        session.getStatus(),
+        confirmed,
+        waiting);
   }
 
   /** 내 신청 내역. 정렬은 신청 일시 내림차순으로 고정하고 호출자의 sort는 버린다(FR-07). */

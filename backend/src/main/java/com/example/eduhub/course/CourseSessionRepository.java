@@ -14,6 +14,10 @@ public interface CourseSessionRepository extends JpaRepository<CourseSession, Lo
 
   List<CourseSession> findByCourseIdOrderByStartAtAscIdAsc(Long courseId);
 
+  /** 회차와 과정을 한 번에 읽는다(락 없음). 조회 화면용이다. 쓰기에는 {@link #findByIdForUpdate}를 쓴다. */
+  @Query("select s from CourseSession s join fetch s.course where s.id = :id")
+  Optional<CourseSession> findByIdWithCourse(@Param("id") Long id);
+
   /**
    * 회차 행을 비관적 쓰기 락으로 조회한다. 신청 트랜잭션의 첫 쿼리로 쓴다. 과정 행까지 잠기지 않도록 fetch join을 붙이지 않는다(D-06). 락 대기는
    * 3초까지다.

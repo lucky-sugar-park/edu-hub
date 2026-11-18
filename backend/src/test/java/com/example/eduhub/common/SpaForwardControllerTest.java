@@ -33,6 +33,30 @@ class SpaForwardControllerTest {
   }
 
   @Test
+  void loginScreenForwardsToIndex() throws Exception {
+    mockMvc
+        .perform(get("/login"))
+        .andExpect(status().isOk())
+        .andExpect(forwardedUrl("/index.html"));
+  }
+
+  @Test
+  void myEnrollmentsScreenForwardsToIndex() throws Exception {
+    mockMvc
+        .perform(get("/me/enrollments"))
+        .andExpect(status().isOk())
+        .andExpect(forwardedUrl("/index.html"));
+  }
+
+  @Test
+  void rosterScreenForwardsToIndex() throws Exception {
+    mockMvc
+        .perform(get("/admin/sessions/12/roster"))
+        .andExpect(status().isOk())
+        .andExpect(forwardedUrl("/index.html"));
+  }
+
+  @Test
   void unknownScreenIsNotForwarded() throws Exception {
     mockMvc.perform(get("/no-such-screen")).andExpect(status().isNotFound());
   }

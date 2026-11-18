@@ -182,6 +182,20 @@ class OpenApiDocsTest {
                 .value(org.hamcrest.Matchers.hasItem("CANCELLED")));
   }
 
+  @Test
+  void apiDocsIncludeScreenFieldsOnMyEnrollmentsAndRoster() throws Exception {
+    String mine = "$.components.schemas.MyEnrollmentResponse.properties";
+    String roster = "$.components.schemas.SessionRosterResponse.properties";
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(mine + ".courseId").exists())
+        .andExpect(jsonPath(roster + ".courseId").exists())
+        .andExpect(jsonPath(roster + ".courseTitle").exists())
+        .andExpect(jsonPath(roster + ".startAt").exists())
+        .andExpect(jsonPath(roster + ".place").exists());
+  }
+
   // A10
   @Test
   void apiDocsDeclareBearerAuthScheme() throws Exception {
