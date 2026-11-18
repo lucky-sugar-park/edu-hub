@@ -127,13 +127,113 @@ class EnrollmentRepositoryTest {
     enrollmentRepository.saveAndFlush(enrollment(sessionD, "E5", EnrollmentStatus.CONFIRMED));
 
     var counts =
-        enrollmentRepository.countBySessionIdsAndStatus(
+        enrollmentRepository.countBySessionIdsAndStatusIn(
             List.of(sessionA.getId(), sessionB.getId(), sessionC.getId()),
-            EnrollmentStatus.CONFIRMED);
+            EnumSet.of(EnrollmentStatus.CONFIRMED));
 
     assertThat(counts).hasSize(1);
     assertThat(counts.get(0).getSessionId()).isEqualTo(sessionA.getId());
     assertThat(counts.get(0).getConfirmed()).isEqualTo(2);
+  }
+
+  @Test
+  void countsConfirmedAndCompletedTogetherWhenBothStatusesGiven() {
+    CourseSession session = saveSession(saveCourse(), 10);
+    enrollmentRepository.saveAndFlush(Enrollment.confirmed(session, "E1", APPLIED_AT));
+    Enrollment done =
+        enrollmentRepository.saveAndFlush(Enrollment.confirmed(session, "E2", APPLIED_AT));
+    done.complete(APPLIED_AT.plusSeconds(60));
+    enrollmentRepository.saveAndFlush(done);
+    enrollmentRepository.saveAndFlush(Enrollment.confirmed(session, "E4", APPLIED_AT));
+    enrollmentRepository.saveAndFlush(Enrollment.waiting(session, "E3", APPLIED_AT, 1L));
+    Enrollment gone =
+        enrollmentRepository.saveAndFlush(Enrollment.confirmed(session, "E5", APPLIED_AT));
+    gone.cancel(APPLIED_AT.plusSeconds(5));
+    enrollmentRepository.saveAndFlush(gone);
+
+    var counts =
+        enrollmentRepository.countBySessionIdsAndStatusIn(
+            List.of(session.getId()),
+            EnumSet.of(EnrollmentStatus.CONFIRMED, EnrollmentStatus.COMPLETED));
+
+    assertThat(counts).hasSize(1);
+    assertThat(counts.get(0).getConfirmed()).isEqualTo(3);
+  }
+
+  /** 역할은 필터 검증이다. 정렬·순번을 포함한 서비스 동작은 EnrollmentRosterIntegrationTest가 본다. */
+  @Test
+  void rosterQueryExcludesCancelledAndOtherSessionsAndNumbersMatchFormula() {
+    Course course = saveCourse();
+    CourseSession session = saveSession(course, 10);
+    CourseSession other = saveSession(course, 10);
+    enrollmentRepository.saveAndFlush(Enrollment.confirmed(session, "R1", APPLIED_AT));
+    Enrollment done =
+        enrollmentRepository.saveAndFlush(Enrollment.confirmed(session, "R2", APPLIED_AT));
+    done.complete(APPLIED_AT.plusSeconds(60));
+    enrollmentRepository.saveAndFlush(done);
+    Enrollment gone =
+        enrollmentRepository.saveAndFlush(Enrollment.confirmed(session, "R3", APPLIED_AT));
+    gone.cancel(APPLIED_AT.plusSeconds(5));
+    enrollmentRepository.saveAndFlush(gone);
+    enrollmentRepository.saveAndFlush(Enrollment.waiting(session, "W1", APPLIED_AT, 4L));
+    enrollmentRepository.saveAndFlush(Enrollment.waiting(session, "W2", APPLIED_AT, -2L));
+    enrollmentRepository.saveAndFlush(Enrollment.waiting(session, "W3", APPLIED_AT, 1L));
+    enrollmentRepository.saveAndFlush(Enrollment.confirmed(other, "R9", APPLIED_AT));
+    entityManager.clear();
+
+    var rows =
+        enrollmentRepository.findBySessionIdAndStatusIn(
+            session.getId(),
+            EnumSet.of(
+                EnrollmentStatus.CONFIRMED, EnrollmentStatus.COMPLETED, EnrollmentStatus.WAITING));
+
+    assertThat(rows)
+        .extracting(Enrollment::getEmployeeId)
+        .containsExactlyInAnyOrder("R1", "R2", "W1", "W2", "W3");
+    // 목록 순서 1..n이 D-23 식(키가 더 작은 대기자 수 + 1)과 같다.
+    var waitingByKey =
+        rows.stream()
+            .filter(e -> e.getStatus() == EnrollmentStatus.WAITING)
+            .sorted(java.util.Comparator.comparing(Enrollment::getWaitingKey))
+            .toList();
+    for (int i = 0; i < waitingByKey.size(); i++) {
+      long ahead =
+          enrollmentRepository.countBySessionIdAndStatusAndWaitingKeyLessThan(
+              session.getId(), EnrollmentStatus.WAITING, waitingByKey.get(i).getWaitingKey());
+      assertThat(i + 1).isEqualTo(ahead + 1);
+    }
+  }
+
+  @Test
+  void roundTripsCompletedAt() {
+    CourseSession session = saveSession(saveCourse(), 10);
+    Instant completedAt = Instant.parse("2026-12-01T05:00:00Z");
+    Enrollment enrollment =
+        enrollmentRepository.saveAndFlush(Enrollment.confirmed(session, EMPLOYEE, APPLIED_AT));
+    enrollment.complete(completedAt);
+    enrollmentRepository.saveAndFlush(enrollment);
+    entityManager.clear();
+
+    Enrollment reloaded = enrollmentRepository.findById(enrollment.getId()).orElseThrow();
+
+    assertThat(reloaded.getStatus()).isEqualTo(EnrollmentStatus.COMPLETED);
+    assertThat(reloaded.getCompletedAt()).isEqualTo(completedAt);
+    assertThat(reloaded.getConfirmedAt()).isEqualTo(APPLIED_AT);
+  }
+
+  @Test
+  void completedRowDoesNotConflictWithNewActiveRowOfSameEmployee() {
+    CourseSession session = saveSession(saveCourse(), 10);
+    Enrollment first =
+        enrollmentRepository.saveAndFlush(Enrollment.confirmed(session, EMPLOYEE, APPLIED_AT));
+    first.complete(APPLIED_AT.plusSeconds(60));
+    enrollmentRepository.saveAndFlush(first);
+
+    Enrollment second =
+        enrollmentRepository.saveAndFlush(Enrollment.confirmed(session, EMPLOYEE, APPLIED_AT));
+
+    assertThat(second.getId()).isNotNull().isNotEqualTo(first.getId());
+    assertThat(first.getStatus()).isEqualTo(EnrollmentStatus.COMPLETED);
   }
 
   @Test
@@ -375,6 +475,202 @@ class EnrollmentRepositoryTest {
     assertThat(sameKey.getId()).isNotNull();
     assertThat(waiting.getWaitingKey()).isNull();
     assertThat(secondCancelled.getWaitingKey()).isNull();
+  }
+
+  private static final String ME = "MY-A";
+  private static final String OTHER = "MY-B";
+
+  @Test
+  void myEnrollmentsReturnsOnlyOwnRowsNewestFirst() {
+    Course course = saveCourse();
+    CourseSession s1 = saveSession(course, 10);
+    CourseSession s2 = saveSession(course, 10);
+    CourseSession s3 = saveSession(course, 10);
+    Enrollment confirmed =
+        enrollmentRepository.saveAndFlush(Enrollment.confirmed(s1, ME, APPLIED_AT));
+    Enrollment waiting =
+        enrollmentRepository.saveAndFlush(
+            Enrollment.waiting(s2, ME, APPLIED_AT.plusSeconds(10), 1L));
+    Enrollment cancelled =
+        enrollmentRepository.saveAndFlush(Enrollment.confirmed(s3, ME, APPLIED_AT.plusSeconds(20)));
+    cancelled.cancel(APPLIED_AT.plusSeconds(30));
+    enrollmentRepository.saveAndFlush(cancelled);
+    enrollmentRepository.saveAndFlush(Enrollment.confirmed(s1, OTHER, APPLIED_AT));
+    enrollmentRepository.saveAndFlush(Enrollment.waiting(s2, OTHER, APPLIED_AT, 2L));
+    entityManager.clear();
+
+    var page = enrollmentRepository.findMyEnrollments(ME, null, PageRequest.of(0, 20));
+
+    assertThat(page.getContent())
+        .extracting(MyEnrollmentRow::id)
+        .containsExactly(cancelled.getId(), waiting.getId(), confirmed.getId());
+    assertThat(page.getTotalElements()).isEqualTo(3);
+    MyEnrollmentRow first = page.getContent().get(0);
+    assertThat(first.courseTitle()).isEqualTo("JPA 입문");
+    assertThat(first.sessionId()).isEqualTo(s3.getId());
+    assertThat(first.sessionStartAt()).isEqualTo(START_AT);
+    assertThat(first.sessionPlace()).isEqualTo("본사 3층");
+    assertThat(first.appliedAt()).isEqualTo(APPLIED_AT.plusSeconds(20));
+  }
+
+  @Test
+  void myEnrollmentsFiltersByStatus() {
+    Course course = saveCourse();
+    CourseSession s1 = saveSession(course, 10);
+    CourseSession s2 = saveSession(course, 10);
+    enrollmentRepository.saveAndFlush(Enrollment.confirmed(s1, ME, APPLIED_AT));
+    Enrollment waiting =
+        enrollmentRepository.saveAndFlush(Enrollment.waiting(s2, ME, APPLIED_AT, 1L));
+    enrollmentRepository.saveAndFlush(Enrollment.waiting(s2, OTHER, APPLIED_AT, 2L));
+    CourseSession s3 = saveSession(course, 10);
+    Enrollment cancelled =
+        enrollmentRepository.saveAndFlush(Enrollment.confirmed(s3, ME, APPLIED_AT));
+    cancelled.cancel(APPLIED_AT.plusSeconds(5));
+    enrollmentRepository.saveAndFlush(cancelled);
+    enrollmentRepository.saveAndFlush(Enrollment.confirmed(s3, OTHER, APPLIED_AT));
+    entityManager.clear();
+
+    var page =
+        enrollmentRepository.findMyEnrollments(ME, EnrollmentStatus.WAITING, PageRequest.of(0, 20));
+    var cancelledPage =
+        enrollmentRepository.findMyEnrollments(
+            ME, EnrollmentStatus.CANCELLED, PageRequest.of(0, 20));
+
+    assertThat(page.getContent()).extracting(MyEnrollmentRow::id).containsExactly(waiting.getId());
+    assertThat(page.getTotalElements()).isEqualTo(1);
+    assertThat(cancelledPage.getContent())
+        .extracting(MyEnrollmentRow::id)
+        .containsExactly(cancelled.getId());
+    assertThat(cancelledPage.getContent().get(0).waitingNumber()).isNull();
+    assertThat(cancelledPage.getTotalElements()).isEqualTo(1);
+  }
+
+  @Test
+  void myEnrollmentsWaitingNumberMatchesWaitingNumbersFormula() {
+    Course course = saveCourse();
+    CourseSession s1 = saveSession(course, 10);
+    CourseSession s2 = saveSession(course, 10);
+    enrollmentRepository.saveAndFlush(Enrollment.waiting(s1, OTHER, APPLIED_AT, 1L));
+    Enrollment w1 =
+        enrollmentRepository.saveAndFlush(
+            Enrollment.waiting(s1, ME, APPLIED_AT.plusSeconds(1), 2L));
+    enrollmentRepository.saveAndFlush(Enrollment.waiting(s2, OTHER, APPLIED_AT, 1L));
+    enrollmentRepository.saveAndFlush(Enrollment.waiting(s2, "MY-C", APPLIED_AT, 2L));
+    Enrollment w2 =
+        enrollmentRepository.saveAndFlush(
+            Enrollment.waiting(s2, ME, APPLIED_AT.plusSeconds(2), 3L));
+    // 같은 회차의 확정·취소 행은 순번에 섞이지 않는다.
+    enrollmentRepository.saveAndFlush(Enrollment.confirmed(s2, "MY-D", APPLIED_AT));
+    Enrollment gone =
+        enrollmentRepository.saveAndFlush(Enrollment.waiting(s2, "MY-E", APPLIED_AT, 0L));
+    gone.cancel(APPLIED_AT.plusSeconds(5));
+    enrollmentRepository.saveAndFlush(gone);
+    entityManager.clear();
+
+    var rows = enrollmentRepository.findMyEnrollments(ME, null, PageRequest.of(0, 20));
+
+    MyEnrollmentRow r1 = rowOf(rows.getContent(), w1.getId());
+    MyEnrollmentRow r2 = rowOf(rows.getContent(), w2.getId());
+    assertThat(r1.waitingNumber()).isEqualTo(2L);
+    assertThat(r2.waitingNumber()).isEqualTo(3L);
+    assertThat(r1.waitingNumber())
+        .isEqualTo(
+            enrollmentRepository.countBySessionIdAndStatusAndWaitingKeyLessThan(
+                    s1.getId(), EnrollmentStatus.WAITING, w1.getWaitingKey())
+                + 1);
+    assertThat(r2.waitingNumber())
+        .isEqualTo(
+            enrollmentRepository.countBySessionIdAndStatusAndWaitingKeyLessThan(
+                    s2.getId(), EnrollmentStatus.WAITING, w2.getWaitingKey())
+                + 1);
+  }
+
+  @Test
+  void myEnrollmentsWaitingNumberHandlesNegativeKeys() {
+    CourseSession session = saveSession(saveCourse(), 10);
+    enrollmentRepository.saveAndFlush(Enrollment.waiting(session, ME, APPLIED_AT, -1L));
+    enrollmentRepository.saveAndFlush(Enrollment.waiting(session, "MY-C", APPLIED_AT, 1L));
+    enrollmentRepository.saveAndFlush(Enrollment.waiting(session, "MY-D", APPLIED_AT, 2L));
+    entityManager.clear();
+
+    assertThat(waitingNumberOf("MY-C", session)).isEqualTo(2L);
+    assertThat(waitingNumberOf("MY-D", session)).isEqualTo(3L);
+    assertThat(waitingNumberOf(ME, session)).isEqualTo(1L);
+  }
+
+  @Test
+  void myEnrollmentsWaitingNumberIsNullUnlessWaiting() {
+    Course course = saveCourse();
+    CourseSession s1 = saveSession(course, 10);
+    CourseSession s2 = saveSession(course, 10);
+    enrollmentRepository.saveAndFlush(Enrollment.confirmed(s1, ME, APPLIED_AT));
+    Enrollment cancelled =
+        enrollmentRepository.saveAndFlush(Enrollment.waiting(s2, ME, APPLIED_AT, 1L));
+    cancelled.cancel(APPLIED_AT.plusSeconds(5));
+    enrollmentRepository.saveAndFlush(cancelled);
+    entityManager.clear();
+
+    var rows = enrollmentRepository.findMyEnrollments(ME, null, PageRequest.of(0, 20));
+
+    assertThat(rows.getContent()).hasSize(2);
+    assertThat(rows.getContent()).allSatisfy(r -> assertThat(r.waitingNumber()).isNull());
+  }
+
+  @Test
+  void myEnrollmentsOrdersByIdDescWhenAppliedAtIsSame() {
+    Course course = saveCourse();
+    Enrollment a =
+        enrollmentRepository.saveAndFlush(
+            Enrollment.confirmed(saveSession(course, 10), ME, APPLIED_AT));
+    Enrollment b =
+        enrollmentRepository.saveAndFlush(
+            Enrollment.confirmed(saveSession(course, 10), ME, APPLIED_AT));
+    entityManager.clear();
+
+    var rows = enrollmentRepository.findMyEnrollments(ME, null, PageRequest.of(0, 20));
+
+    assertThat(rows.getContent())
+        .extracting(MyEnrollmentRow::id)
+        .containsExactly(b.getId(), a.getId());
+  }
+
+  @Test
+  void myEnrollmentsPagesWithTotalCount() {
+    Course course = saveCourse();
+    List<Long> ids = new java.util.ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      ids.add(
+          enrollmentRepository
+              .saveAndFlush(
+                  Enrollment.confirmed(saveSession(course, 10), ME, APPLIED_AT.plusSeconds(i)))
+              .getId());
+    }
+    entityManager.clear();
+
+    var first = enrollmentRepository.findMyEnrollments(ME, null, PageRequest.of(0, 2));
+    var last = enrollmentRepository.findMyEnrollments(ME, null, PageRequest.of(2, 2));
+
+    assertThat(first.getContent())
+        .extracting(MyEnrollmentRow::id)
+        .containsExactly(ids.get(4), ids.get(3));
+    assertThat(first.getTotalElements()).isEqualTo(5);
+    assertThat(last.getContent()).extracting(MyEnrollmentRow::id).containsExactly(ids.get(0));
+    assertThat(last.getTotalElements()).isEqualTo(5);
+  }
+
+  private Long waitingNumberOf(String employeeId, CourseSession session) {
+    return enrollmentRepository
+        .findMyEnrollments(employeeId, null, PageRequest.of(0, 20))
+        .getContent()
+        .stream()
+        .filter(r -> r.sessionId().equals(session.getId()))
+        .findFirst()
+        .orElseThrow()
+        .waitingNumber();
+  }
+
+  private static MyEnrollmentRow rowOf(List<MyEnrollmentRow> rows, Long id) {
+    return rows.stream().filter(r -> r.id().equals(id)).findFirst().orElseThrow();
   }
 
   private final AtomicLong nextWaitingKey = new AtomicLong(1);

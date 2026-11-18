@@ -98,6 +98,16 @@ public class CourseSession {
     }
   }
 
+  /** 수료 처리 가능한 회차인지 검사한다. 시작 후 종료된 회차만 가능하다(D-28). 검사 순서는 시작 → 종료다. */
+  public void ensureCompletable(Instant now) {
+    if (!hasStarted(now)) {
+      throw new ConflictException("SESSION_NOT_STARTED", "아직 시작하지 않은 회차는 수료 처리할 수 없습니다: " + id);
+    }
+    if (status != CourseSessionStatus.CLOSED) {
+      throw new ConflictException("SESSION_NOT_CLOSED", "종료되지 않은 회차는 수료 처리할 수 없습니다: " + id);
+    }
+  }
+
   private void ensureOpen() {
     if (status == CourseSessionStatus.CLOSED) {
       throw new ConflictException("SESSION_CLOSED", "종료된 회차입니다: " + id);

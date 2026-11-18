@@ -11,3 +11,7 @@ spring:
     web:
       pageable:
         max-page-size: 100
+eduhub:
+  admin:
+    # 쉼표로 구분한 관리자 사번. 비어 있으면 관리자가 없다(D-29)
+    employee-ids: ${EDUHUB_ADMIN_EMPLOYEE_IDS:}

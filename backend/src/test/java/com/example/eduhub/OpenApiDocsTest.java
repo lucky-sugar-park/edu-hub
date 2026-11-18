@@ -23,7 +23,9 @@ class OpenApiDocsTest {
     mockMvc
         .perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.paths['/api/health'].get").exists());
+        .andExpect(jsonPath("$.paths['/api/health'].get.summary").exists())
+        .andExpect(jsonPath("$.paths['/api/health'].get.tags[0]").value("Health"))
+        .andExpect(jsonPath("$.paths['/api/health'].get.responses['200']").exists());
   }
 
   @Test
@@ -94,6 +96,78 @@ class OpenApiDocsTest {
         .andExpect(jsonPath(path + ".responses['404']").exists())
         .andExpect(
             jsonPath("$.components.schemas.EnrollmentResponse.properties.waitingNumber").exists());
+  }
+
+  @Test
+  void apiDocsIncludeMyEnrollmentsListWithSingleRequiredHeader() throws Exception {
+    String path = "$.paths['/api/v1/me/enrollments'].get";
+    String params = path + ".parameters";
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(path + ".summary").exists())
+        .andExpect(jsonPath(path + ".responses['200']").exists())
+        .andExpect(jsonPath(path + ".responses['400']").exists())
+        .andExpect(
+            jsonPath(params + "[?(@.name=='X-Employee-Id' && @.in=='header')].required")
+                .value(org.hamcrest.Matchers.contains(true)))
+        .andExpect(
+            jsonPath(params + "[?(@.name=='X-Employee-Id')]")
+                .value(org.hamcrest.Matchers.hasSize(1)))
+        .andExpect(
+            jsonPath(params + "[?(@.name=='employeeId')]").value(org.hamcrest.Matchers.empty()))
+        .andExpect(
+            jsonPath(params + "[?(@.name=='pageable')]").value(org.hamcrest.Matchers.empty()))
+        .andExpect(jsonPath(params + "[?(@.name=='sort')]").value(org.hamcrest.Matchers.empty()))
+        .andExpect(
+            jsonPath(params + "[?(@.name=='status')]").value(org.hamcrest.Matchers.hasSize(1)));
+  }
+
+  @Test
+  void apiDocsIncludeEnrollmentAdminEndpointsWithSingleRequiredHeader() throws Exception {
+    String roster = "$.paths['/api/v1/admin/sessions/{sessionId}/roster'].get";
+    String completions = "$.paths['/api/v1/admin/sessions/{sessionId}/completions'].post";
+    for (String path : new String[] {roster, completions}) {
+      String params = path + ".parameters";
+      mockMvc
+          .perform(get("/v3/api-docs"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath(path + ".summary").exists())
+          .andExpect(jsonPath(path + ".tags[0]").value("EnrollmentAdmin"))
+          .andExpect(jsonPath(path + ".responses['200']").exists())
+          .andExpect(jsonPath(path + ".responses['400']").exists())
+          .andExpect(jsonPath(path + ".responses['403']").exists())
+          .andExpect(jsonPath(path + ".responses['404']").exists())
+          .andExpect(
+              jsonPath(params + "[?(@.name=='X-Employee-Id' && @.in=='header')].required")
+                  .value(org.hamcrest.Matchers.contains(true)))
+          .andExpect(
+              jsonPath(params + "[?(@.name=='X-Employee-Id')]")
+                  .value(org.hamcrest.Matchers.hasSize(1)))
+          .andExpect(
+              jsonPath(params + "[?(@.name=='adminId')]").value(org.hamcrest.Matchers.empty()));
+    }
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(completions + ".responses['409']").exists())
+        .andExpect(jsonPath(completions + ".responses['503']").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.CompletionResponse.properties.failed.items.$ref")
+                .exists());
+  }
+
+  @Test
+  void apiDocsShowCompletionRequestListLimits() throws Exception {
+    String employeeIds = "$.components.schemas.CompletionRequest.properties.employeeIds";
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.components.schemas.CompletionRequest.required").isArray())
+        .andExpect(jsonPath(employeeIds + ".minItems").value(1))
+        .andExpect(jsonPath(employeeIds + ".maxItems").value(200))
+        .andExpect(jsonPath(employeeIds + ".items.minLength").value(1))
+        .andExpect(jsonPath(employeeIds + ".items.maxLength").value(20));
   }
 
   @Test

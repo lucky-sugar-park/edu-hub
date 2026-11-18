@@ -5,6 +5,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -31,8 +32,9 @@ class EnrollmentSeatCounterTest {
   void mapsCountsBySessionId() {
     List<SessionConfirmedCount> counts = List.of(count(1L, 4), count(3L, 7));
     given(
-            enrollmentRepository.countBySessionIdsAndStatus(
-                List.of(1L, 2L, 3L), EnrollmentStatus.CONFIRMED))
+            enrollmentRepository.countBySessionIdsAndStatusIn(
+                List.of(1L, 2L, 3L),
+                EnumSet.of(EnrollmentStatus.CONFIRMED, EnrollmentStatus.COMPLETED)))
         .willReturn(counts);
 
     Map<Long, Long> result = counter.countConfirmedBySessionIds(List.of(1L, 2L, 3L));

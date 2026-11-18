@@ -42,6 +42,9 @@ public class Enrollment {
   /** 취소 시각. CANCELLED일 때만 값이 있다(D-25). */
   private Instant cancelledAt;
 
+  /** 수료 시각. COMPLETED일 때만 값이 있다(D-28). */
+  private Instant completedAt;
+
   protected Enrollment() {}
 
   private Enrollment(
@@ -98,6 +101,15 @@ public class Enrollment {
     this.waitingKey = null;
   }
 
+  /** 확정에서 수료로 바꾼다. 확정 시각은 그대로 둔다(D-28). */
+  public void complete(Instant now) {
+    if (status != EnrollmentStatus.CONFIRMED) {
+      throw new IllegalStateException("확정 상태만 수료 처리할 수 있습니다: " + status);
+    }
+    this.status = EnrollmentStatus.COMPLETED;
+    this.completedAt = now;
+  }
+
   public Long getId() {
     return id;
   }
@@ -128,5 +140,9 @@ public class Enrollment {
 
   public Instant getCancelledAt() {
     return cancelledAt;
+  }
+
+  public Instant getCompletedAt() {
+    return completedAt;
   }
 }

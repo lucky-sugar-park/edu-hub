@@ -10,7 +10,8 @@
       "Bash(npm run generate:api)",
       "Bash(git status)",
       "Bash(git diff *)",
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "mcp__eduhub-db__mysql_query"
     ],
     "ask": [
       "Bash(git push *)",
@@ -56,6 +57,10 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/format.sh\"",
             "timeout": 120
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-openapi.sh\""
           }
         ]
       }
