@@ -23,7 +23,9 @@ class OpenApiDocsTest {
     mockMvc
         .perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.paths['/api/health'].get").exists());
+        .andExpect(jsonPath("$.paths['/api/health'].get.summary").exists())
+        .andExpect(jsonPath("$.paths['/api/health'].get.tags[0]").value("Health"))
+        .andExpect(jsonPath("$.paths['/api/health'].get.responses['200']").exists());
   }
 
   @Test
