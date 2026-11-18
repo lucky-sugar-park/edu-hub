@@ -3,9 +3,18 @@ package com.example.eduhub.common;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Instant;
+import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.context.request.ServletWebRequest;
 
 class CurrentEmployeeArgumentResolverTest {
@@ -15,6 +24,11 @@ class CurrentEmployeeArgumentResolverTest {
   @SuppressWarnings("unused")
   void handler(@CurrentEmployee String annotated, String plain, @CurrentEmployee Long wrongType) {}
 
+  @AfterEach
+  void clearContext() {
+    SecurityContextHolder.clearContext();
+  }
+
   private MethodParameter param(int index) throws Exception {
     var method =
         CurrentEmployeeArgumentResolverTest.class.getDeclaredMethod(
@@ -22,52 +36,64 @@ class CurrentEmployeeArgumentResolverTest {
     return new MethodParameter(method, index);
   }
 
-  private Object resolve(String header) throws Exception {
-    MockHttpServletRequest request = new MockHttpServletRequest();
-    if (header != null) {
-      request.addHeader(CurrentEmployeeArgumentResolver.EMPLOYEE_ID_HEADER, header);
-    }
-    return resolver.resolveArgument(param(0), null, new ServletWebRequest(request), null);
+  private Object resolve() throws Exception {
+    return resolver.resolveArgument(
+        param(0), null, new ServletWebRequest(new MockHttpServletRequest()), null);
+  }
+
+  /** 주체 이름(name)을 {@code subject}로 하는 JWT 인증을 SecurityContext에 둔다. */
+  private static void login(String subject) {
+    Jwt jwt =
+        Jwt.withTokenValue("t")
+            .header("alg", "HS256")
+            .claim("roles", List.of("EMPLOYEE"))
+            .issuedAt(Instant.now())
+            .expiresAt(Instant.now().plusSeconds(60))
+            .build();
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new JwtAuthenticationToken(
+                jwt, List.of(new SimpleGrantedAuthority("ROLE_EMPLOYEE")), subject));
   }
 
   @Test
-  void resolvesHeaderValueAsIs() throws Exception {
-    assertThat(resolve("E1001")).isEqualTo("E1001");
-    assertThat(resolve(" E1 ")).isEqualTo(" E1 ");
-  }
-
-  @Test
-  void rejectsMissingHeader() {
-    assertThatThrownBy(() -> resolve(null))
-        .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("X-Employee-Id: 사번이 필요합니다");
-  }
-
-  @Test
-  void rejectsBlankHeader() {
-    assertThatThrownBy(() -> resolve("   "))
-        .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("X-Employee-Id: 사번이 필요합니다");
-  }
-
-  @Test
-  void rejectsControlCharacterOnlyHeader() {
-    assertThatThrownBy(() -> resolve("\u0001"))
-        .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("X-Employee-Id: 사번이 필요합니다");
+  void resolvesSubjectOfJwtAsIs() throws Exception {
+    login("E1001");
+    assertThat(resolve()).isEqualTo("E1001");
   }
 
   @Test
   void acceptsExactlyTwentyCharacters() throws Exception {
-    String value = "A".repeat(20);
-    assertThat(resolve(value)).isEqualTo(value);
+    login("A".repeat(20));
+    assertThat(resolve()).isEqualTo("A".repeat(20));
   }
 
   @Test
-  void rejectsTwentyOneCharacters() {
-    assertThatThrownBy(() -> resolve("A".repeat(21)))
-        .isInstanceOf(InvalidRequestException.class)
-        .hasMessage("X-Employee-Id: 20자 이하여야 합니다");
+  void rejectsWhenNoAuthentication() {
+    assertThatThrownBy(this::resolve)
+        .isInstanceOf(AuthenticationCredentialsNotFoundException.class);
+  }
+
+  @Test
+  void rejectsNonJwtAuthentication() {
+    SecurityContextHolder.getContext()
+        .setAuthentication(new TestingAuthenticationToken("E1001", "x", "ROLE_EMPLOYEE"));
+    assertThatThrownBy(this::resolve)
+        .isInstanceOf(AuthenticationCredentialsNotFoundException.class);
+  }
+
+  @Test
+  void rejectsBlankSubject() {
+    login("   ");
+    assertThatThrownBy(this::resolve)
+        .isInstanceOf(AuthenticationCredentialsNotFoundException.class);
+  }
+
+  @Test
+  void rejectsMissingSubject() {
+    login(null);
+    assertThatThrownBy(this::resolve)
+        .isInstanceOf(AuthenticationCredentialsNotFoundException.class);
   }
 
   @Test

@@ -15,3 +15,8 @@ eduhub:
   admin:
     # 쉼표로 구분한 관리자 사번. 비어 있으면 관리자가 없다(D-29)
     employee-ids: ${EDUHUB_ADMIN_EMPLOYEE_IDS:}
+  auth:
+    # Base64 인코딩 32바이트 이상. 값은 환경 변수로만 준다. 비어 있으면 dev 로그인이 켜진 프로필에서만 무작위 키로 기동한다(D-30)
+    jwt-secret: ${EDUHUB_JWT_SECRET:}
+    token-ttl: 8h
+    dev-login-enabled: false

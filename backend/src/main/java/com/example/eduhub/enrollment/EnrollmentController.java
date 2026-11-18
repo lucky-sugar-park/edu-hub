@@ -1,7 +1,6 @@
 package com.example.eduhub.enrollment;
 
 import com.example.eduhub.common.CurrentEmployee;
-import com.example.eduhub.common.CurrentEmployeeArgumentResolver;
 import com.example.eduhub.common.ErrorResponse;
 import com.example.eduhub.common.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,16 +9,14 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,6 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
  * DUPLICATE_ENROLLMENT(같은 회차에 활성 신청이 이미 있음). 503 응답의 code: LOCK_TIMEOUT(회차 락 대기 시간 초과).
  */
 @Tag(name = "Enrollment", description = "수강 신청")
+@SecurityRequirement(name = "bearerAuth")
+@ApiResponse(
+    responseCode = "401",
+    description = "로그인이 필요함(UNAUTHORIZED)",
+    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 @RestController
 public class EnrollmentController {
 
@@ -44,7 +46,6 @@ public class EnrollmentController {
     this.enrollmentQueryService = enrollmentQueryService;
   }
 
-  // TODO(NFR-03): 인증 도입 후 로그인 사용자에서 사번을 꺼내고 헤더를 없앤다
   @Operation(
       summary = "회차에 수강 신청한다",
       description =
@@ -54,7 +55,7 @@ public class EnrollmentController {
       description = "신청 성공(CONFIRMED 또는 WAITING). WAITING이면 waitingNumber 포함")
   @ApiResponse(
       responseCode = "400",
-      description = "사번 헤더 누락·공백·20자 초과, 또는 회차 id가 숫자가 아님",
+      description = "회차 id가 숫자가 아님",
       content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   @ApiResponse(
       responseCode = "404",
@@ -73,23 +74,17 @@ public class EnrollmentController {
   @PostMapping("/api/v1/sessions/{sessionId}/enrollments")
   @ResponseStatus(HttpStatus.CREATED)
   public EnrollmentResponse enroll(
-      @PathVariable Long sessionId,
-      @Parameter(description = "신청자 사번. 인증 도입 전 임시")
-          @RequestHeader("X-Employee-Id")
-          @NotBlank
-          @Size(max = 20)
-          String employeeId) {
+      @PathVariable Long sessionId, @Parameter(hidden = true) @CurrentEmployee String employeeId) {
     return enrollmentCommandService.enroll(sessionId, employeeId);
   }
 
-  // TODO(NFR-03): 인증 도입 후 로그인 사용자에서 사번을 꺼내고 헤더를 없앤다
   @Operation(
       summary = "회차의 내 신청과 대기 순번을 조회한다",
       description = "그 회차의 활성 신청(CONFIRMED 또는 WAITING)을 돌려준다. WAITING이면 현재 waitingNumber가 있다")
   @ApiResponse(responseCode = "200", description = "내 활성 신청과 대기 순번")
   @ApiResponse(
       responseCode = "400",
-      description = "사번 헤더 누락·공백·20자 초과, 또는 회차 id가 숫자가 아님",
+      description = "회차 id가 숫자가 아님",
       content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   @ApiResponse(
       responseCode = "404",
@@ -97,21 +92,15 @@ public class EnrollmentController {
       content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   @GetMapping("/api/v1/sessions/{sessionId}/enrollments/me")
   public EnrollmentResponse getMyEnrollment(
-      @PathVariable Long sessionId,
-      @Parameter(description = "신청자 사번. 인증 도입 전 임시")
-          @RequestHeader("X-Employee-Id")
-          @NotBlank
-          @Size(max = 20)
-          String employeeId) {
+      @PathVariable Long sessionId, @Parameter(hidden = true) @CurrentEmployee String employeeId) {
     return enrollmentQueryService.getMyEnrollment(sessionId, employeeId);
   }
 
-  // TODO(NFR-03): 인증 도입 후 로그인 사용자에서 사번을 꺼내고 헤더를 없앤다
   @Operation(summary = "회차의 내 신청을 취소한다", description = "교육 시작 전까지만. 확정자가 취소하면 대기 1순위가 확정된다")
   @ApiResponse(responseCode = "200", description = "취소된 신청(status=CANCELLED)")
   @ApiResponse(
       responseCode = "400",
-      description = "사번 헤더 누락·공백·20자 초과, 또는 회차 id가 숫자가 아님",
+      description = "회차 id가 숫자가 아님",
       content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   @ApiResponse(
       responseCode = "404",
@@ -127,24 +116,13 @@ public class EnrollmentController {
       content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   @PostMapping("/api/v1/sessions/{sessionId}/enrollments/me/cancel")
   public EnrollmentResponse cancel(
-      @PathVariable Long sessionId,
-      @Parameter(description = "신청자 사번. 인증 도입 전 임시")
-          @RequestHeader("X-Employee-Id")
-          @NotBlank
-          @Size(max = 20)
-          String employeeId) {
+      @PathVariable Long sessionId, @Parameter(hidden = true) @CurrentEmployee String employeeId) {
     return enrollmentCommandService.cancel(sessionId, employeeId);
   }
 
   @Operation(
       summary = "내 신청 내역을 조회한다",
       description = "status를 생략하면 전체. 신청 일시 최신순. WAITING이면 waitingNumber가 있다")
-  @Parameter(
-      in = ParameterIn.HEADER,
-      name = CurrentEmployeeArgumentResolver.EMPLOYEE_ID_HEADER,
-      required = true,
-      description = "신청자 사번. 인증 도입 전 임시",
-      schema = @Schema(type = "string", maxLength = 20))
   @Parameter(
       name = "page",
       in = ParameterIn.QUERY,
@@ -158,7 +136,7 @@ public class EnrollmentController {
   @ApiResponse(responseCode = "200", description = "내 신청 목록(신청 일시 내림차순). 없으면 빈 목록")
   @ApiResponse(
       responseCode = "400",
-      description = "사번 헤더 누락·공백·20자 초과, 또는 알 수 없는 status 값",
+      description = "알 수 없는 status 값",
       content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   @GetMapping("/api/v1/me/enrollments")
   public PageResponse<MyEnrollmentResponse> getMyEnrollments(

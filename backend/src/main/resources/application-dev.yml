@@ -6,6 +6,11 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
 
+eduhub:
+  auth:
+    # 개발 환경 전용 로그인(비밀번호 없음). 운영 프로필에서는 켜지 않는다
+    dev-login-enabled: true
+
 logging:
   level:
     org.hibernate.SQL: debug

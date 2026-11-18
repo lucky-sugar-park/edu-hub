@@ -1,5 +1,6 @@
 package com.example.eduhub.enrollment;
 
+import static com.example.eduhub.common.WebMvcSecurityTestConfig.employee;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
@@ -15,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.eduhub.common.ConflictException;
 import com.example.eduhub.common.PageResponse;
+import com.example.eduhub.common.WebMvcSecurityTestConfig;
 import com.example.eduhub.course.SessionNotFoundException;
 import java.time.Instant;
 import java.util.List;
@@ -22,20 +24,20 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.data.domain.Pageable;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(EnrollmentController.class)
-@ActiveProfiles("test")
+@Import(WebMvcSecurityTestConfig.class)
 class EnrollmentControllerTest {
 
   private static final String URL = "/api/v1/sessions/3/enrollments";
   private static final String ME_URL = "/api/v1/sessions/3/enrollments/me";
   private static final String CANCEL_URL = "/api/v1/sessions/3/enrollments/me/cancel";
-  private static final String HEADER = "X-Employee-Id";
 
   @Autowired private MockMvc mockMvc;
 
@@ -67,7 +69,7 @@ class EnrollmentControllerTest {
         .willReturn(myPage());
 
     mockMvc
-        .perform(get(MY_LIST_URL).header(HEADER, "E1001"))
+        .perform(get(MY_LIST_URL).with(employee("E1001")))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].courseTitle").value("JPA 입문"))
         .andExpect(jsonPath("$.content[0].waitingNumber").value(2))
@@ -85,7 +87,7 @@ class EnrollmentControllerTest {
         .willReturn(myPage());
 
     mockMvc
-        .perform(get(MY_LIST_URL).param("size", "100000").header(HEADER, "E1001"))
+        .perform(get(MY_LIST_URL).param("size", "100000").with(employee("E1001")))
         .andExpect(status().isOk());
 
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
@@ -99,33 +101,25 @@ class EnrollmentControllerTest {
         .willReturn(myPage());
 
     mockMvc
-        .perform(get(MY_LIST_URL).param("status", "WAITING").header(HEADER, "E1001"))
+        .perform(get(MY_LIST_URL).param("status", "WAITING").with(employee("E1001")))
         .andExpect(status().isOk());
     verify(enrollmentQueryService)
         .getMyEnrollments(eq("E1001"), eq(EnrollmentStatus.WAITING), any());
   }
 
   @Test
-  void myEnrollmentsRejectsMissingBlankAndTooLongHeader() throws Exception {
+  void myEnrollmentsRejectsMissingToken() throws Exception {
     mockMvc
         .perform(get(MY_LIST_URL))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
-    mockMvc
-        .perform(get(MY_LIST_URL).header(HEADER, "   "))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
-    mockMvc
-        .perform(get(MY_LIST_URL).header(HEADER, "A".repeat(21)))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     verifyNoInteractions(enrollmentQueryService);
   }
 
   @Test
   void myEnrollmentsRejectsUnknownStatus() throws Exception {
     mockMvc
-        .perform(get(MY_LIST_URL).param("status", "UNKNOWN").header(HEADER, "E1001"))
+        .perform(get(MY_LIST_URL).param("status", "UNKNOWN").with(employee("E1001")))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
     verifyNoInteractions(enrollmentQueryService);
@@ -144,7 +138,7 @@ class EnrollmentControllerTest {
                 Instant.parse("2026-11-12T01:00:00Z")));
 
     mockMvc
-        .perform(post(URL).header(HEADER, "E1001"))
+        .perform(post(URL).with(employee("E1001")))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value(10))
         .andExpect(jsonPath("$.sessionId").value(3))
@@ -167,7 +161,7 @@ class EnrollmentControllerTest {
                 Instant.parse("2026-11-12T01:00:00Z")));
 
     mockMvc
-        .perform(post(URL).header(HEADER, "E1002"))
+        .perform(post(URL).with(employee("E1002")))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.status").value("WAITING"))
         .andExpect(jsonPath("$.waitingNumber").value(4))
@@ -187,7 +181,7 @@ class EnrollmentControllerTest {
                 Instant.parse("2026-11-12T01:00:00Z")));
 
     mockMvc
-        .perform(post(URL).header(HEADER, "E1001"))
+        .perform(post(URL).with(employee("E1001")))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.waitingNumber").value(nullValue()));
   }
@@ -205,7 +199,7 @@ class EnrollmentControllerTest {
                 Instant.parse("2026-11-12T01:00:00Z")));
 
     mockMvc
-        .perform(get(ME_URL).header(HEADER, "E1002"))
+        .perform(get(ME_URL).with(employee("E1002")))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(11))
         .andExpect(jsonPath("$.sessionId").value(3))
@@ -217,11 +211,11 @@ class EnrollmentControllerTest {
   }
 
   @Test
-  void getMyEnrollmentRejectsMissingHeader() throws Exception {
+  void getMyEnrollmentRejectsMissingToken() throws Exception {
     mockMvc
         .perform(get(ME_URL))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     verifyNoInteractions(enrollmentQueryService);
   }
 
@@ -231,7 +225,7 @@ class EnrollmentControllerTest {
         .willThrow(new EnrollmentNotFoundException(3L));
 
     mockMvc
-        .perform(get(ME_URL).header(HEADER, "E1001"))
+        .perform(get(ME_URL).with(employee("E1001")))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("NOT_FOUND"));
   }
@@ -249,7 +243,7 @@ class EnrollmentControllerTest {
                 Instant.parse("2026-11-12T01:00:00Z")));
 
     mockMvc
-        .perform(post(CANCEL_URL).header(HEADER, "E1001"))
+        .perform(post(CANCEL_URL).with(employee("E1001")))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(10))
         .andExpect(jsonPath("$.status").value("CANCELLED"))
@@ -258,11 +252,11 @@ class EnrollmentControllerTest {
   }
 
   @Test
-  void cancelRejectsMissingHeader() throws Exception {
+  void cancelRejectsMissingToken() throws Exception {
     mockMvc
         .perform(post(CANCEL_URL))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     verifyNoInteractions(enrollmentCommandService);
   }
 
@@ -272,7 +266,7 @@ class EnrollmentControllerTest {
         .willThrow(new EnrollmentNotFoundException(3L));
 
     mockMvc
-        .perform(post(CANCEL_URL).header(HEADER, "E1001"))
+        .perform(post(CANCEL_URL).with(employee("E1001")))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("NOT_FOUND"));
   }
@@ -283,7 +277,7 @@ class EnrollmentControllerTest {
         .willThrow(new ConflictException("SESSION_STARTED", "교육이 시작된 회차는 취소할 수 없습니다: 3"));
 
     mockMvc
-        .perform(post(CANCEL_URL).header(HEADER, "E1001"))
+        .perform(post(CANCEL_URL).with(employee("E1001")))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("SESSION_STARTED"));
   }
@@ -294,35 +288,38 @@ class EnrollmentControllerTest {
         .willThrow(new CannotAcquireLockException("lock timeout"));
 
     mockMvc
-        .perform(post(CANCEL_URL).header(HEADER, "E1001"))
+        .perform(post(CANCEL_URL).with(employee("E1001")))
         .andExpect(status().isServiceUnavailable())
         .andExpect(jsonPath("$.code").value("LOCK_TIMEOUT"));
   }
 
   @Test
-  void enrollRejectsMissingHeader() throws Exception {
+  void enrollRejectsMissingToken() throws Exception {
     mockMvc
         .perform(post(URL))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     verifyNoInteractions(enrollmentCommandService);
   }
 
   @Test
-  void enrollRejectsBlankHeader() throws Exception {
+  void enrollRejectsTokenWithBlankSubject() throws Exception {
+    // 사번이 없는 토큰은 인증 정보가 없는 것으로 보고 401이다(리졸버의 방어 경로).
     mockMvc
-        .perform(post(URL).header(HEADER, "  "))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+        .perform(post(URL).with(employee("   ")))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     verifyNoInteractions(enrollmentCommandService);
   }
 
   @Test
-  void enrollRejectsTooLongHeader() throws Exception {
+  @WithMockUser(username = "E1001")
+  void enrollRejectsNonJwtAuthentication() throws Exception {
+    // JWT가 아닌 인증(여기서는 mock user)은 사번을 꺼낼 수 없어 401이다(리졸버의 instanceof 분기).
     mockMvc
-        .perform(post(URL).header(HEADER, "E".repeat(21)))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+        .perform(post(URL))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     verifyNoInteractions(enrollmentCommandService);
   }
 
@@ -331,7 +328,7 @@ class EnrollmentControllerTest {
     given(enrollmentCommandService.enroll(3L, "E1001")).willThrow(new SessionNotFoundException(3L));
 
     mockMvc
-        .perform(post(URL).header(HEADER, "E1001"))
+        .perform(post(URL).with(employee("E1001")))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("NOT_FOUND"));
   }
@@ -342,7 +339,7 @@ class EnrollmentControllerTest {
         .willThrow(new ConflictException("SESSION_STARTED", "교육이 시작된 회차에는 신청할 수 없습니다: 3"));
 
     mockMvc
-        .perform(post(URL).header(HEADER, "E1001"))
+        .perform(post(URL).with(employee("E1001")))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("SESSION_STARTED"));
   }
@@ -353,7 +350,7 @@ class EnrollmentControllerTest {
         .willThrow(new DuplicateEnrollmentException(3L));
 
     mockMvc
-        .perform(post(URL).header(HEADER, "E1001"))
+        .perform(post(URL).with(employee("E1001")))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("DUPLICATE_ENROLLMENT"));
   }
@@ -364,7 +361,7 @@ class EnrollmentControllerTest {
         .willThrow(new CannotAcquireLockException("lock timeout"));
 
     mockMvc
-        .perform(post(URL).header(HEADER, "E1001"))
+        .perform(post(URL).with(employee("E1001")))
         .andExpect(status().isServiceUnavailable())
         .andExpect(jsonPath("$.code").value("LOCK_TIMEOUT"));
   }

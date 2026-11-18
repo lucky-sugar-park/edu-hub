@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -17,12 +18,21 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 관리자의 과정·회차 관리(FR-03). 인증(D-11)을 붙일 때 {@code /api/v1/admin/**}에 관리자 권한을 건다.
+ * 관리자의 과정·회차 관리(FR-03). {@code /api/v1/admin/**}는 보안 필터 체인이 ADMIN 역할을 요구한다(D-30).
  *
- * <p>409 응답의 code: COURSE_CLOSED(종료된 과정), SESSION_CLOSED(종료된 회차), SESSION_STARTED(시작 후 정원·시작 시각
- * 변경), SESSION_NOT_STARTED(시작 전 회차 종료).
+ * <p>401(UNAUTHORIZED)·403(FORBIDDEN)은 클래스 수준에 문서화했다. 409 응답의 code: COURSE_CLOSED(종료된 과정),
+ * SESSION_CLOSED(종료된 회차), SESSION_STARTED(시작 후 정원·시작 시각 변경), SESSION_NOT_STARTED(시작 전 회차 종료).
  */
 @Tag(name = "CourseAdmin", description = "관리자의 과정·회차 등록, 수정, 종료")
+@SecurityRequirement(name = "bearerAuth")
+@ApiResponse(
+    responseCode = "401",
+    description = "로그인이 필요함(UNAUTHORIZED)",
+    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+@ApiResponse(
+    responseCode = "403",
+    description = "관리자가 아님(FORBIDDEN)",
+    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 @RestController
 @RequestMapping("/api/v1/admin")
 public class CourseAdminController {
