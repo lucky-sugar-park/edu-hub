@@ -35,6 +35,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         .body(new ErrorResponse(HttpStatus.BAD_REQUEST.name(), exception.getMessage()));
   }
 
+  @ExceptionHandler(ForbiddenException.class)
+  public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenException exception) {
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+        .body(new ErrorResponse("FORBIDDEN", exception.getMessage()));
+  }
+
   /** 회차 락을 기다리다 시간이 지났다. 재시도할 수 있다. */
   @ExceptionHandler(PessimisticLockingFailureException.class)
   public ResponseEntity<ErrorResponse> handleLockTimeout(

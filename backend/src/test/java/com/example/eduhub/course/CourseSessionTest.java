@@ -17,6 +17,32 @@ class CourseSessionTest {
   }
 
   @Test
+  void rejectsCompletionBeforeStart() {
+    CourseSession session = sessionStartingAt(NOW.plusSeconds(1));
+
+    assertThatThrownBy(() -> session.ensureCompletable(NOW))
+        .isInstanceOfSatisfying(
+            ConflictException.class, e -> assertThat(e.getCode()).isEqualTo("SESSION_NOT_STARTED"));
+  }
+
+  @Test
+  void rejectsCompletionOfOpenSessionAtStartTime() {
+    CourseSession session = sessionStartingAt(NOW);
+
+    assertThatThrownBy(() -> session.ensureCompletable(NOW))
+        .isInstanceOfSatisfying(
+            ConflictException.class, e -> assertThat(e.getCode()).isEqualTo("SESSION_NOT_CLOSED"));
+  }
+
+  @Test
+  void allowsCompletionOfClosedSession() {
+    CourseSession session = sessionStartingAt(NOW.minusSeconds(3600));
+    session.close(NOW);
+
+    assertThatCode(() -> session.ensureCompletable(NOW)).doesNotThrowAnyException();
+  }
+
+  @Test
   void allowsEnrollmentBeforeStart() {
     CourseSession session = sessionStartingAt(NOW.plusSeconds(1));
 

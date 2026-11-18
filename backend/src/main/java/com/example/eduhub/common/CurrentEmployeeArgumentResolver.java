@@ -26,6 +26,11 @@ public class CurrentEmployeeArgumentResolver implements HandlerMethodArgumentRes
       ModelAndViewContainer mavContainer,
       NativeWebRequest webRequest,
       WebDataBinderFactory binderFactory) {
+    return readEmployeeId(webRequest);
+  }
+
+  /** 사번 헤더를 읽고 검사한다. 관리자 리졸버도 같은 규칙을 쓴다. */
+  static String readEmployeeId(NativeWebRequest webRequest) {
     String value = webRequest.getHeader(EMPLOYEE_ID_HEADER);
     if (value == null || value.trim().isEmpty()) {
       throw new InvalidRequestException(EMPLOYEE_ID_HEADER + ": 사번이 필요합니다");

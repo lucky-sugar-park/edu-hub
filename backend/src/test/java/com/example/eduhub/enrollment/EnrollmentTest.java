@@ -110,6 +110,51 @@ class EnrollmentTest {
   }
 
   @Test
+  void completeTurnsConfirmedIntoCompletedKeepingConfirmedAt() {
+    Enrollment enrollment = Enrollment.confirmed(session, EMPLOYEE_ID, NOW);
+    Instant later = NOW.plusSeconds(7200);
+
+    enrollment.complete(later);
+
+    assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.COMPLETED);
+    assertThat(enrollment.getCompletedAt()).isEqualTo(later);
+    assertThat(enrollment.getConfirmedAt()).isEqualTo(NOW);
+  }
+
+  @Test
+  void completeRejectsWaitingEnrollment() {
+    Enrollment enrollment = Enrollment.waiting(session, EMPLOYEE_ID, NOW, 3L);
+
+    assertThatThrownBy(() -> enrollment.complete(NOW.plusSeconds(60)))
+        .isInstanceOf(IllegalStateException.class);
+    assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.WAITING);
+    assertThat(enrollment.getCompletedAt()).isNull();
+  }
+
+  @Test
+  void completeRejectsCancelledEnrollment() {
+    Enrollment enrollment = Enrollment.confirmed(session, EMPLOYEE_ID, NOW);
+    enrollment.cancel(NOW.plusSeconds(30));
+
+    assertThatThrownBy(() -> enrollment.complete(NOW.plusSeconds(60)))
+        .isInstanceOf(IllegalStateException.class);
+    assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.CANCELLED);
+    assertThat(enrollment.getCompletedAt()).isNull();
+  }
+
+  @Test
+  void completeRejectsAlreadyCompletedEnrollment() {
+    Enrollment enrollment = Enrollment.confirmed(session, EMPLOYEE_ID, NOW);
+    Instant first = NOW.plusSeconds(60);
+    enrollment.complete(first);
+
+    assertThatThrownBy(() -> enrollment.complete(NOW.plusSeconds(120)))
+        .isInstanceOf(IllegalStateException.class);
+    assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.COMPLETED);
+    assertThat(enrollment.getCompletedAt()).isEqualTo(first);
+  }
+
+  @Test
   void promoteRejectsConfirmedEnrollment() {
     Enrollment enrollment = Enrollment.confirmed(session, EMPLOYEE_ID, NOW);
 

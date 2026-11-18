@@ -13,6 +13,7 @@ import com.example.eduhub.common.PageResponse;
 import com.example.eduhub.course.Course;
 import com.example.eduhub.course.CourseSession;
 import com.example.eduhub.course.CourseSessionRepository;
+import com.example.eduhub.course.CourseSessionStatus;
 import com.example.eduhub.course.SessionNotFoundException;
 import java.time.Instant;
 import java.util.Collection;
@@ -164,5 +165,111 @@ class EnrollmentQueryServiceTest {
     assertThat(statuses.getValue())
         .containsExactlyInAnyOrderElementsOf(
             Set.of(EnrollmentStatus.CONFIRMED, EnrollmentStatus.WAITING));
+  }
+
+  private Enrollment withId(Enrollment enrollment, long id) {
+    ReflectionTestUtils.setField(enrollment, "id", id);
+    return enrollment;
+  }
+
+  private void givenRoster(Enrollment... rows) {
+    given(courseSessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
+    given(enrollmentRepository.findBySessionIdAndStatusIn(eq(SESSION_ID), any()))
+        .willReturn(List.of(rows));
+  }
+
+  @Test
+  void rosterSortsConfirmedByConfirmedAtThenIdAndIncludesCompleted() {
+    Enrollment late = withId(Enrollment.confirmed(session, "E3", NOW.plusSeconds(10)), 30L);
+    Enrollment tieHigh = withId(Enrollment.confirmed(session, "E2", NOW), 20L);
+    Enrollment tieLow = withId(Enrollment.confirmed(session, "E1", NOW), 10L);
+    Enrollment done = withId(Enrollment.confirmed(session, "E4", NOW.plusSeconds(5)), 40L);
+    done.complete(NOW.plusSeconds(100));
+    givenRoster(late, tieHigh, done, tieLow);
+
+    SessionRosterResponse roster = service.getRoster(SESSION_ID);
+
+    assertThat(roster.sessionId()).isEqualTo(SESSION_ID);
+    assertThat(roster.capacity()).isEqualTo(5);
+    assertThat(roster.sessionStatus()).isEqualTo(CourseSessionStatus.OPEN);
+    assertThat(roster.confirmed())
+        .extracting(SessionRosterResponse.ConfirmedEntry::enrollmentId)
+        .containsExactly(10L, 20L, 40L, 30L);
+    SessionRosterResponse.ConfirmedEntry completed = roster.confirmed().get(2);
+    assertThat(completed.status()).isEqualTo(EnrollmentStatus.COMPLETED);
+    assertThat(completed.completedAt()).isEqualTo(NOW.plusSeconds(100));
+    assertThat(completed.confirmedAt()).isEqualTo(NOW.plusSeconds(5));
+    assertThat(roster.confirmed().get(0).completedAt()).isNull();
+    assertThat(roster.waiting()).isEmpty();
+  }
+
+  @Test
+  void rosterNumbersWaitingByKeyAscendingIncludingNegativeKeys() {
+    Enrollment k5 = withId(Enrollment.waiting(session, "W1", NOW, 5L), 1L);
+    Enrollment kNeg = withId(Enrollment.waiting(session, "W2", NOW.plusSeconds(1), -3L), 2L);
+    Enrollment k1 = withId(Enrollment.waiting(session, "W3", NOW.plusSeconds(2), 1L), 3L);
+    givenRoster(k5, kNeg, k1);
+
+    SessionRosterResponse roster = service.getRoster(SESSION_ID);
+
+    assertThat(roster.waiting())
+        .extracting(
+            SessionRosterResponse.WaitingEntry::employeeId,
+            SessionRosterResponse.WaitingEntry::waitingNumber)
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple("W2", 1),
+            org.assertj.core.groups.Tuple.tuple("W3", 2),
+            org.assertj.core.groups.Tuple.tuple("W1", 3));
+    assertThat(roster.waiting().get(0).appliedAt()).isEqualTo(NOW.plusSeconds(1));
+    assertThat(roster.confirmed()).isEmpty();
+  }
+
+  @Test
+  void rosterQueriesOnlyConfirmedCompletedWaitingStatuses() {
+    givenRoster();
+
+    service.getRoster(SESSION_ID);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Collection<EnrollmentStatus>> captor = ArgumentCaptor.forClass(Collection.class);
+    verify(enrollmentRepository).findBySessionIdAndStatusIn(eq(SESSION_ID), captor.capture());
+    assertThat(captor.getValue())
+        .containsExactlyInAnyOrder(
+            EnrollmentStatus.CONFIRMED, EnrollmentStatus.COMPLETED, EnrollmentStatus.WAITING);
+  }
+
+  @Test
+  void rosterDoesNotFailOnNullConfirmedAt() {
+    Enrollment odd = withId(Enrollment.confirmed(session, "E1", NOW), 1L);
+    ReflectionTestUtils.setField(odd, "confirmedAt", null);
+    Enrollment normal = withId(Enrollment.confirmed(session, "E2", NOW), 2L);
+    givenRoster(odd, normal);
+
+    assertThat(service.getRoster(SESSION_ID).confirmed())
+        .extracting(SessionRosterResponse.ConfirmedEntry::enrollmentId)
+        .containsExactly(2L, 1L);
+  }
+
+  @Test
+  void rosterPutsWaitingRowWithNullKeyLastWithoutFailing() {
+    Enrollment odd = withId(Enrollment.waiting(session, "W0", NOW, 1L), 1L);
+    ReflectionTestUtils.setField(odd, "waitingKey", null);
+    Enrollment first = withId(Enrollment.waiting(session, "W1", NOW, 2L), 2L);
+    Enrollment second = withId(Enrollment.waiting(session, "W2", NOW, 3L), 3L);
+    givenRoster(odd, second, first);
+
+    assertThat(service.getRoster(SESSION_ID).waiting())
+        .extracting(SessionRosterResponse.WaitingEntry::employeeId)
+        .containsExactly("W1", "W2", "W0");
+  }
+
+  @Test
+  void rosterThrowsWhenSessionNotFound() {
+    given(courseSessionRepository.findById(SESSION_ID)).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.getRoster(SESSION_ID))
+        .isInstanceOf(SessionNotFoundException.class);
+
+    verify(enrollmentRepository, never()).findBySessionIdAndStatusIn(anyLong(), any());
   }
 }
