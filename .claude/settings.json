@@ -57,6 +57,10 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/format.sh\"",
             "timeout": 120
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-openapi.sh\""
           }
         ]
       }
