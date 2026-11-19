@@ -124,3 +124,11 @@ it("from이 /login이면 /로 보낸다", async () => {
 
   expect(await screen.findByText("홈 화면")).toBeInTheDocument();
 });
+
+it("from이 /login/(후행 슬래시)여도 /로 보낸다", async () => {
+  renderLogin({ from: "/login/" });
+
+  submit("E1001");
+
+  expect(await screen.findByText("홈 화면")).toBeInTheDocument();
+});

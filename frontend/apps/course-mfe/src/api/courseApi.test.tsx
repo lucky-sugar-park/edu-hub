@@ -34,6 +34,7 @@ beforeEach(() => {
 
 afterEach(() => {
   httpClient.defaults.adapter = originalAdapter;
+  setAuthHooks({ getToken: () => null, clearToken: () => {}, onUnauthorized: () => {} });
 });
 
 function Where() {
@@ -205,4 +206,43 @@ it("공개 경로라도 POST 401은 재시도하지 않는다", async () => {
   await expect(httpClient.post("/api/v1/courses")).rejects.toBeTruthy();
 
   expect(calls).toHaveLength(1);
+});
+
+/** 요청 도중 토큰이 "new"로 바뀌고, 지정한 상태 코드를 차례로 돌려주는 어댑터. 마지막 값은 계속 쓴다. */
+function swapTokenDuringRequest(codes: number[]) {
+  let current: string | null = "old";
+  const clearToken = vi.fn();
+  const onUnauthorized = vi.fn();
+  setAuthHooks({ getToken: () => current, clearToken, onUnauthorized });
+  httpClient.defaults.adapter = async (config: AdapterConfig) => {
+    calls.push({
+      url: config.url ?? "",
+      authorization: (config.headers.get("Authorization") as string | undefined) ?? null,
+    });
+    current = "new";
+    const status = codes.length > 1 ? (codes.shift() as number) : codes[0];
+    const response = { data: {}, status, statusText: "", headers: {}, config };
+    if (status >= 400) throw Object.assign(new Error(`HTTP ${status}`), { response, config });
+    return response;
+  };
+  return { clearToken, onUnauthorized };
+}
+
+it("공개 GET 도중 토큰이 바뀌면 새 토큰으로 재시도하고 지우지 않는다", async () => {
+  const { clearToken } = swapTokenDuringRequest([401, 200]);
+
+  await httpClient.get("/api/v1/courses/3");
+
+  expect(calls).toHaveLength(2);
+  expect(calls[0].authorization).toBe("Bearer old");
+  expect(calls[1].authorization).toBe("Bearer new");
+  expect(clearToken).not.toHaveBeenCalled();
+});
+
+it("재시도가 계속 401이어도 한 번만 다시 요청한다", async () => {
+  swapTokenDuringRequest([401]);
+
+  await expect(httpClient.get("/api/v1/courses/3")).rejects.toBeTruthy();
+
+  expect(calls).toHaveLength(2);
 });

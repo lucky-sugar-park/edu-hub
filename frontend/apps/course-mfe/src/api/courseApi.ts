@@ -45,6 +45,8 @@ function isLoginRequest(config: InternalAxiosRequestConfig): boolean {
 /** 요청을 보낼 때 붙인 토큰을 config에 남긴다. 늦게 온 401이 새 세션을 지우지 않게 비교하는 데 쓴다. */
 interface TrackedConfig extends InternalAxiosRequestConfig {
   sentToken?: string;
+  /** 토큰 없이(또는 바뀐 토큰으로) 다시 보낸 요청. 재시도는 한 번만 한다. */
+  retried?: boolean;
 }
 
 /** 모든 API 클래스가 공유하는 Axios 인스턴스(인터셉터는 여기에만 둔다). */
@@ -70,10 +72,10 @@ httpClient.interceptors.response.use(undefined, async (error: unknown) => {
   // 백엔드는 공개 경로라도 무효 토큰이 붙으면 401을 낸다. 토큰은 항상 지운다.
   if (!stale && sent !== null) hooks.clearToken();
 
-  if (sent !== null && isPublicGet(config)) {
+  if (sent !== null && !config.retried && isPublicGet(config)) {
     // 토큰 없이(또는 바뀐 지금 토큰으로) 한 번 다시 요청한다. 요청 인터셉터가 헤더를 다시 정한다.
     config.headers.delete("Authorization");
-    return httpClient.request(config);
+    return httpClient.request({ ...config, retried: true } as TrackedConfig);
   }
   if (!stale) hooks.onUnauthorized();
   throw error;

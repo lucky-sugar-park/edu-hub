@@ -10,10 +10,12 @@ const SSO_MESSAGE = "이 환경에서는 사내 SSO 연동 전까지 로그인�
 function safeFrom(state: unknown): string {
   const from = (state as { from?: unknown } | null)?.from;
   if (typeof from !== "string" || !from.startsWith("/") || from.startsWith("//")) return "/";
-  if ([...from].some((c) => c === "\\" || c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127)) return "/";
+  if ([...from].some((c) => c === "\\" || c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127))
+    return "/";
   try {
     const url = new URL(from, window.location.origin);
-    if (url.origin !== window.location.origin || url.pathname === "/login") return "/";
+    if (url.origin !== window.location.origin || url.pathname.replace(/\/+$/, "") === "/login")
+      return "/";
   } catch {
     return "/";
   }
@@ -41,9 +43,7 @@ export function LoginPage() {
       await login(id);
       navigate(safeFrom(location.state), { replace: true });
     } catch (cause) {
-      setError(
-        cause instanceof DevLoginUnavailableError ? SSO_MESSAGE : toErrorMessage(cause),
-      );
+      setError(cause instanceof DevLoginUnavailableError ? SSO_MESSAGE : toErrorMessage(cause));
       setSubmitting(false);
     }
   }

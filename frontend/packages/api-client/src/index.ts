@@ -31,6 +31,7 @@ export {
   ConfirmedEntryStatusEnum,
   EnrollmentResponseStatusEnum,
   FailureReasonEnum,
+  GetMyEnrollmentsStatusEnum,
   MyEnrollmentResponseStatusEnum,
 } from "./generated";
 // 앱이 axios에 직접 의존하지 않게 여기서 내보낸다. 인스턴스 생성은 앱의 api/courseApi.ts 한 곳에서만 한다.
