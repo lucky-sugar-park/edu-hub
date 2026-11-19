@@ -1,4 +1,4 @@
-import { AppBar, Box, Button, Container, Toolbar, Typography } from "@mui/material";
+import { AppBar, Box, Button, Toolbar, Typography } from "@mui/material";
 import { startTransition } from "react";
 import {
   NavLink,
@@ -16,18 +16,7 @@ import { CourseDetailPage } from "./pages/CourseDetailPage";
 import { CourseListPage } from "./pages/CourseListPage";
 import { LoginPage } from "./pages/LoginPage";
 import { MyEnrollmentsPage } from "./pages/MyEnrollmentsPage";
-
-/** T7에서 실제 화면으로 바꾼다. */
-function ComingSoon({ title }: { title: string }) {
-  return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Typography variant="h6" component="h1">
-        {title}
-      </Typography>
-      <Typography color="text.secondary">준비 중입니다.</Typography>
-    </Container>
-  );
-}
+import { SessionRosterPage } from "./pages/SessionRosterPage";
 
 /**
  * 화면 경로(D-18, D-31): / 과정 목록, /courses/:id 과정 상세, /login 로그인,
@@ -109,7 +98,7 @@ export function App() {
           path="/admin/sessions/:sessionId/roster"
           element={
             <RequireAdmin>
-              <ComingSoon title="회차 명단" />
+              <SessionRosterPage />
             </RequireAdmin>
           }
         />

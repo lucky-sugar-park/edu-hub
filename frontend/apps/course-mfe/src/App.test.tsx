@@ -12,6 +12,9 @@ vi.mock("./pages/CourseDetailPage", () => ({ CourseDetailPage: () => <div>과정
 vi.mock("./pages/MyEnrollmentsPage", () => ({
   MyEnrollmentsPage: () => <h1>내 신청 내역</h1>,
 }));
+vi.mock("./pages/SessionRosterPage", () => ({
+  SessionRosterPage: () => <h1>회차 명단 화면</h1>,
+}));
 vi.mock("./pages/AdminCoursePage", () => ({ AdminCoursePage: () => <div>과정 관리 화면</div> }));
 
 const admin = () => fakeAuth(["EMPLOYEE", "ADMIN"], "E9001");
@@ -87,4 +90,15 @@ it("로그아웃하면 홈으로 가고 로그인 버튼이 나타난다", () =>
   expect(screen.getByText("과정 목록 화면")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "로그인" })).toBeInTheDocument();
   expect(sessionStorage.getItem("eduhub.auth")).toBeNull();
+});
+
+it("관리자는 명단 경로를 볼 수 있다", () => {
+  renderWithProviders(<App />, { route: "/admin/sessions/10/roster", auth: admin() });
+  expect(screen.getByRole("heading", { name: "회차 명단 화면" })).toBeInTheDocument();
+});
+
+it("비로그인으로 명단 경로를 열면 로그인 화면으로 보낸다", () => {
+  renderWithProviders(<App />, { route: "/admin/sessions/10/roster" });
+
+  expect(screen.getByText("개발 환경 전용 로그인(비밀번호 없음)")).toBeInTheDocument();
 });

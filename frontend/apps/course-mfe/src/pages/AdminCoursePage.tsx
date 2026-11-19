@@ -19,6 +19,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useMemo, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CourseFormDialog } from "../components/CourseFormDialog";
 import { SessionFormDialog } from "../components/SessionFormDialog";
@@ -265,6 +266,13 @@ export function AdminCoursePage() {
                         {sessionOpen && started && " · 교육 시작됨"}
                       </TableCell>
                       <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                        <Button
+                          size="small"
+                          component={RouterLink}
+                          to={`/admin/sessions/${session.id}/roster`}
+                        >
+                          명단
+                        </Button>
                         <Button
                           size="small"
                           disabled={!sessionOpen}

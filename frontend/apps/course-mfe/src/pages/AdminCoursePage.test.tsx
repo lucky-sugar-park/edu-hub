@@ -243,3 +243,15 @@ it("목록을 불러오지 못하면 에러를 보여 준다", () => {
 
   expect(screen.getByRole("alert")).toHaveTextContent("과정 목록을 불러오지 못했습니다.");
 });
+
+it("회차 표의 '명단' 링크는 명단 화면을 가리킨다", () => {
+  renderWithProviders(<AdminCoursePage />);
+  const section = selectCourse();
+
+  const links = within(section).getAllByRole("link", { name: "명단" });
+
+  expect(links.map((link) => link.getAttribute("href"))).toEqual([
+    "/admin/sessions/10/roster",
+    "/admin/sessions/11/roster",
+  ]);
+});
