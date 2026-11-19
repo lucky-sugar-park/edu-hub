@@ -15,8 +15,9 @@ import { AdminCoursePage } from "./pages/AdminCoursePage";
 import { CourseDetailPage } from "./pages/CourseDetailPage";
 import { CourseListPage } from "./pages/CourseListPage";
 import { LoginPage } from "./pages/LoginPage";
+import { MyEnrollmentsPage } from "./pages/MyEnrollmentsPage";
 
-/** T6·T7에서 실제 화면으로 바꾼다. */
+/** T7에서 실제 화면으로 바꾼다. */
 function ComingSoon({ title }: { title: string }) {
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -92,7 +93,7 @@ export function App() {
           path="/me/enrollments"
           element={
             <RequireAuth>
-              <ComingSoon title="내 신청 내역" />
+              <MyEnrollmentsPage />
             </RequireAuth>
           }
         />

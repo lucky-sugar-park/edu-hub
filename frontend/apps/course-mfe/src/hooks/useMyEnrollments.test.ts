@@ -129,3 +129,78 @@ it("토큰이 A에서 B로 바로 바뀌면 다시 조회하고 A의 늦은 응�
   });
   expect(result.current.data).toEqual(pageB);
 });
+
+it("조건이 바뀌면 data를 비우고 loading이 true가 되며, reload로는 유지한다", async () => {
+  api.getMyEnrollments.mockResolvedValue({ data: page } as Response<typeof api.getMyEnrollments>);
+  const { result, rerender } = renderHook(({ p }) => useMyEnrollments(undefined, p, 20), {
+    initialProps: { p: 0 },
+  });
+  await waitFor(() => expect(result.current.data).toEqual(page));
+
+  act(() => result.current.reload());
+  expect(result.current.data).toEqual(page);
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  api.getMyEnrollments.mockReturnValue(
+    new Promise(() => {}) as ReturnType<typeof api.getMyEnrollments>,
+  );
+  rerender({ p: 1 });
+
+  await waitFor(() => expect(result.current.data).toBeNull());
+  expect(result.current.loading).toBe(true);
+});
+
+it("조건이 바뀐 뒤 실패하면 이전 조건의 데이터가 남지 않는다", async () => {
+  api.getMyEnrollments.mockResolvedValue({ data: page } as Response<typeof api.getMyEnrollments>);
+  const { result, rerender } = renderHook(({ s }) => useMyEnrollments(s, 0, 20), {
+    initialProps: { s: undefined as "WAITING" | undefined },
+  });
+  await waitFor(() => expect(result.current.data).toEqual(page));
+
+  api.getMyEnrollments.mockRejectedValue(new Error("boom"));
+  rerender({ s: "WAITING" });
+
+  await waitFor(() => expect(result.current.error?.message).toBe("boom"));
+  expect(result.current.data).toBeNull();
+});
+
+it("조건이 바뀐 첫 렌더는 이전 data 대신 data null, loading true를 돌려준다", async () => {
+  api.getMyEnrollments.mockResolvedValue({ data: page } as Response<typeof api.getMyEnrollments>);
+  const renders: ReturnType<typeof useMyEnrollments>[] = [];
+  const { result, rerender } = renderHook(
+    ({ p }) => {
+      const r = useMyEnrollments(undefined, p, 20);
+      renders.push(r);
+      return r;
+    },
+    { initialProps: { p: 0 } },
+  );
+  await waitFor(() => expect(result.current.data).toEqual(page));
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  const before = renders.length;
+  rerender({ p: 1 });
+
+  expect(renders[before].data).toBeNull();
+  expect(renders[before].loading).toBe(true);
+  expect(renders[before].error).toBeNull();
+});
+
+it("토큰이 바뀐 첫 렌더는 이전 사용자의 data 대신 data null, loading true를 돌려준다", async () => {
+  api.getMyEnrollments.mockResolvedValue({ data: page } as Response<typeof api.getMyEnrollments>);
+  const renders: ReturnType<typeof useMyEnrollments>[] = [];
+  const { result, rerender } = renderHook(() => {
+    const r = useMyEnrollments();
+    renders.push(r);
+    return r;
+  });
+  await waitFor(() => expect(result.current.data).toEqual(page));
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  const before = renders.length;
+  loggedIn("t2");
+  rerender();
+
+  expect(renders[before].data).toBeNull();
+  expect(renders[before].loading).toBe(true);
+});

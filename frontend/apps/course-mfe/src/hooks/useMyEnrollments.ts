@@ -26,11 +26,15 @@ export function useMyEnrollments(
   const reload = useCallback(() => setReloadKey((key) => key + 1), []);
 
   const lastToken = useRef(token);
+  const lastQuery = useRef(`${status ?? ""}|${page}|${size}`);
 
   useEffect(() => {
     // 로그인 사용자가 바뀌면(로그아웃, A에서 B로 바로 전환) 이전 사용자의 결과를 비운다.
-    if (lastToken.current !== token) {
+    // 조회 조건(status, page, size)이 바뀌어도 이전 조건의 행이 남지 않게 비운다. reload는 조건이 그대로라 비우지 않는다.
+    const query = `${status ?? ""}|${page}|${size}`;
+    if (lastToken.current !== token || lastQuery.current !== query) {
       lastToken.current = token;
+      lastQuery.current = query;
       setData(null);
       setError(null);
     }
@@ -63,8 +67,14 @@ export function useMyEnrollments(
     };
   }, [token, loggedIn, status, page, size, reloadKey]);
 
+  // 조건이나 토큰이 바뀐 직후 첫 렌더에는 아직 이전 조건의 data가 상태에 남아 있다(비우기는 효과에서 한다).
+  // 화면이 낡은 값으로 판단하지 않게 이 렌더에서는 "불러오는 중"으로 돌려준다.
+  const stale =
+    lastToken.current !== token || lastQuery.current !== `${status ?? ""}|${page}|${size}`;
+
   if (!loggedIn) {
     return { data: { content: [], page, size, totalElements: 0 }, loading: false, error: null, reload };
   }
+  if (stale) return { data: null, loading: true, error: null, reload };
   return { data, loading, error, reload };
 }

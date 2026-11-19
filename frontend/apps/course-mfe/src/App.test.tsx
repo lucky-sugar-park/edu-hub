@@ -9,6 +9,9 @@ vi.mock("./api/courseApi", () => ({
 }));
 vi.mock("./pages/CourseListPage", () => ({ CourseListPage: () => <div>과정 목록 화면</div> }));
 vi.mock("./pages/CourseDetailPage", () => ({ CourseDetailPage: () => <div>과정 상세 화면</div> }));
+vi.mock("./pages/MyEnrollmentsPage", () => ({
+  MyEnrollmentsPage: () => <h1>내 신청 내역</h1>,
+}));
 vi.mock("./pages/AdminCoursePage", () => ({ AdminCoursePage: () => <div>과정 관리 화면</div> }));
 
 const admin = () => fakeAuth(["EMPLOYEE", "ADMIN"], "E9001");
