@@ -24,7 +24,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link as RouterLink, useParams } from "react-router-dom";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { formatDateTime } from "../format";
@@ -43,6 +43,7 @@ export function SessionRosterPage() {
   const { data, loading, error, reload } = useSessionRoster(id);
   const completion = useCompletion();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [staleNotice, setStaleNotice] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [result, setResult] = useState<CompletionResponse | null>(null);
 
@@ -56,6 +57,10 @@ export function SessionRosterPage() {
   // 받아 오는 중이거나 실패한 동안은 명단이 서버 상태와 다를 수 있어 수료 처리를 막는다.
   const unavailable = loading || error !== null || data === null;
 
+  // 효과 안에서 최신 값을 읽기 위한 ref(의존성에 넣으면 선택할 때마다 효과가 다시 돈다).
+  const latest = useRef({ selected, confirmOpen, completionError: completion.error });
+  latest.current = { selected, confirmOpen, completionError: completion.error };
+
   // 다시 불러온 명단에서 이미 수료됐거나 사라진 사번은 선택에서 뺀다.
   useEffect(() => {
     if (!data) {
@@ -65,10 +70,17 @@ export function SessionRosterPage() {
     const valid = new Set(
       (data.confirmed ?? []).filter((e) => e.status === "CONFIRMED").map((e) => e.employeeId),
     );
-    setSelected((prev) => {
-      const next = new Set([...prev].filter((employeeId) => valid.has(employeeId)));
-      return next.size === prev.size ? prev : next;
-    });
+    const prev = latest.current.selected;
+    const next = new Set([...prev].filter((employeeId) => valid.has(employeeId)));
+    if (next.size === prev.size) return;
+    setSelected(next);
+    // 확인 대화 상자가 열린 채 선택이 모두 사라지면(수료 실패 뒤 다시 불러온 경우 등) 이유를 남긴다.
+    if (next.size === 0 && latest.current.confirmOpen) {
+      const reason = latest.current.completionError;
+      setStaleNotice(
+        `선택한 사번이 더 이상 수료 처리 대상이 아닙니다. 명단을 확인해 주세요${reason ? ` (${reason})` : ""}`,
+      );
+    }
   }, [data]);
 
   // 상한 때문에 전부 선택할 수 없는 회차에서는 "상한까지 선택됨"을 전체 선택으로 본다.
@@ -105,10 +117,11 @@ export function SessionRosterPage() {
       completion.clearError();
       setConfirmOpen(false);
     }
-  }, [confirmOpen, selected, completion]);
+  }, [confirmOpen, selected.size, completion.submitting, completion.clearError]);
 
   function openConfirm() {
     completion.clearError();
+    setStaleNotice(null);
     setConfirmOpen(true);
   }
 
@@ -157,6 +170,11 @@ export function SessionRosterPage() {
 
       {notFound && <Alert severity="warning">회차를 찾을 수 없습니다.</Alert>}
       {forbidden && <Alert severity="error">권한이 없습니다.</Alert>}
+      {staleNotice && (
+        <Alert severity="warning" onClose={() => setStaleNotice(null)} sx={{ mb: 2 }}>
+          {staleNotice}
+        </Alert>
+      )}
 
       {error && !notFound && !forbidden && (
         <Alert

@@ -310,6 +310,25 @@ it("확인 대화 상자를 연 채 선택이 0명이 되면 대화 상자를 �
   fireEvent.click(screen.getByRole("checkbox", { name: "E1001 선택", hidden: true })); // 선택이 0명이 된다.
 
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  // 사용자가 직접 해제한 경우에는 경고를 띄우지 않는다.
+  expect(screen.queryByText(/더 이상 수료 처리 대상이 아닙니다/)).not.toBeInTheDocument();
+});
+
+it("수료 실패 뒤 다시 불러온 명단으로 선택이 비면 대화 상자를 닫고 경고를 남긴다", async () => {
+  completion = { ...completion, error: "회차가 아직 열려 있습니다." };
+  renderPage();
+  fireEvent.click(checkbox("E1001 선택"));
+  fireEvent.click(completeButton());
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+  // 명단이 바뀌어 선택한 사번이 모두 대상에서 빠진다. 다시 그리게 하려고 다른 행을 하나 더 선택한다.
+  given(makeRoster({ confirmed: [] }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "E1002 선택", hidden: true }));
+
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  const notice = screen.getByRole("alert");
+  expect(notice).toHaveTextContent("선택한 사번이 더 이상 수료 처리 대상이 아닙니다. 명단을 확인해 주세요");
+  expect(notice).toHaveTextContent("회차가 아직 열려 있습니다.");
 });
 
 it("진행 중에는 확인 버튼이 꺼진다", () => {

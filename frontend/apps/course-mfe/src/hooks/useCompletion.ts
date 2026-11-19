@@ -1,5 +1,5 @@
 import type { CompletionResponse } from "@eduhub/api-client";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { enrollmentAdminApi } from "../api/courseApi";
 import { toErrorMessage } from "./useCourseAdmin";
 
@@ -31,5 +31,8 @@ export function useCompletion(): UseCompletionResult {
     }
   }, []);
 
-  return { submitting, error, clearError, complete };
+  return useMemo(
+    () => ({ submitting, error, clearError, complete }),
+    [submitting, error, clearError, complete],
+  );
 }
