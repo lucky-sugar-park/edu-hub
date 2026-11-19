@@ -1,7 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { CourseNotFoundError, useCourse } from "../hooks/useCourse";
+import { renderWithProviders } from "../test-utils";
 import { CourseDetailPage } from "./CourseDetailPage";
 
 vi.mock("../hooks/useCourse", async (importOriginal) => ({
@@ -12,13 +12,7 @@ vi.mock("../hooks/useCourse", async (importOriginal) => ({
 const mockedUseCourse = vi.mocked(useCourse);
 
 function renderAt(path: string) {
-  render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/courses/:id" element={<CourseDetailPage />} />
-      </Routes>
-    </MemoryRouter>,
-  );
+  renderWithProviders(<CourseDetailPage />, { route: path, path: "/courses/:id" });
 }
 
 it("과정 정보와 회차를 보여 준다", () => {
