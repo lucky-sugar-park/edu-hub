@@ -21,7 +21,7 @@
 - Controller → Service → Repository 순서로 호출한다. Controller에서 Repository를 직접 호출하지 않는다.
 - 조회 서비스(`CourseQueryService`, readOnly)와 쓰기 서비스(`CourseCommandService`)를 나눈다. 관리자 쓰기 API는 `/api/v1/admin` 아래(`CourseAdminController`)에 둔다(D-18).
 - 상태 규칙(종료 여부, 시작 여부)은 엔티티 메서드에서 검사한다. 현재 시각은 `Clock` 빈(`common/ClockConfig`)으로 받아 테스트에서 고정한다.
-- 프런트 빌드 결과는 `src/main/resources/static`에 두고 백엔드가 함께 제공한다. 화면 경로(`/admin`, `/courses/{id}`)는 `common/SpaForwardController`가 `index.html`로 넘긴다. 프런트에 화면 경로를 추가하면 여기에도 추가한다.
+- 프런트 빌드 결과는 `src/main/resources/static`에 두고 백엔드가 함께 제공한다. 화면 경로(`/admin`, `/courses/{id}`, `/login`, `/me/enrollments`, `/admin/sessions/{sessionId}/roster`)는 `common/SpaForwardController`가 `index.html`로 넘긴다. 프런트에 화면 경로를 추가하면 여기에도 추가한다.
 - `course`는 `enrollment`를 참조하지 않는다. 자리를 차지한 신청 수(확정·수료, D-28)는 `course/SessionSeatCounter`로 받는다(D-22). 정원 변경에 따른 강등도 같은 방식으로 `course/SessionCapacityChangeHandler`를 `enrollment`가 구현해 받는다(D-24).
 - 패키지는 `com.example.eduhub` 아래 도메인별로 나눈다. `course`는 과정과 회차, `enrollment`는 신청·대기·취소·승급·수료, `common`은 공통 코드를 담는다(NFR-07).
 
@@ -38,8 +38,9 @@
 - 문서는 springdoc 기본 경로인 `/v3/api-docs`와 `/swagger-ui.html`에서 제공된다.
 - 에러 응답은 `common/ErrorResponse`(`code`, `message`) 형식이며, `common/GlobalExceptionHandler`에서 처리한다.
   - 404: `NotFoundException` 하위 클래스(`CourseNotFoundException`, `SessionNotFoundException`, `EnrollmentNotFoundException` 등), code `NOT_FOUND`.
-  - 400: 요청 본문 검증 실패는 code `BAD_REQUEST`, message `필드: 메시지, ...`(필드 이름 순). Bean Validation 메시지는 한국어로 직접 적는다. 그 밖의 입력 오류는 `InvalidRequestException`(사번 헤더 오류를 내는 `common/CurrentEmployeeArgumentResolver` 포함).
-  - 403: `ForbiddenException`(관리자 아님, `common/CurrentAdminArgumentResolver`), code `FORBIDDEN`.
+  - 400: 요청 본문 검증 실패는 code `BAD_REQUEST`, message `필드: 메시지, ...`(필드 이름 순). Bean Validation 메시지는 한국어로 직접 적는다. 그 밖의 입력 오류는 `InvalidRequestException`.
+  - 401: 토큰 없음·만료·서명 불일치, code `UNAUTHORIZED`. 403: 역할 부족(`/api/v1/admin/**`에 ADMIN 없음), code `FORBIDDEN`. 둘 다 `common/SecurityConfig`의 핸들러가 고정 문구로 응답한다(D-30).
+  - 인증이 필요한 컨트롤러에는 `@SecurityRequirement(name = "bearerAuth")`와 401(관리자 API는 403도) 응답을 문서화한다. 보안 스킴은 `common/OpenApiConfig`에 있다.
   - 409: `ConflictException(code, message)`. code는 `COURSE_CLOSED`, `SESSION_CLOSED`, `SESSION_STARTED`, `SESSION_NOT_STARTED`, `SESSION_NOT_CLOSED`(종료 전 수료), `DUPLICATE_ENROLLMENT`(같은 회차 활성 신청 중복)처럼 상황별로 둔다.
   - 503: `PessimisticLockingFailureException`(회차 행 락 대기 3초 초과), code `LOCK_TIMEOUT`(D-20).
 
@@ -48,7 +49,9 @@
 - `dev`: 로컬 MariaDB의 `eduhub` 스키마에 접속한다. `DB_USERNAME`, `DB_PASSWORD`는 환경 변수 또는 `.env`(`backend/`나 저장소 루트)로 지정하며, 이름은 `.env.example`에 있다.
 - `test`: 같은 계정으로 로컬 MariaDB의 `eduhub_test` 스키마에 접속한다. DB가 필요한 테스트는 `@ActiveProfiles("test")`를 붙이고, `@DataJpaTest`에는 `@AutoConfigureTestDatabase(replace = NONE)`도 붙인다.
 - `eduhub`와 `eduhub_test` 스키마는 미리 만들어 두어야 한다.
-- 관리자 사번 목록(D-29)은 `eduhub.admin.employee-ids`이며 환경 변수 `EDUHUB_ADMIN_EMPLOYEE_IDS`(쉼표 구분)로 준다. 비어 있으면 관리자가 없다. test 프로필은 `TEST-ADMIN`이지만 OS 환경 변수가 이 값을 덮을 수 있으므로, 관리자 목록에 기대는 테스트는 `@TestPropertySource(properties = "eduhub.admin.employee-ids=TEST-ADMIN")`로 값을 고정한다.
+- JWT 서명 키(D-30)는 환경 변수 `EDUHUB_JWT_SECRET`(Base64, 32바이트 이상)로만 준다. dev·test에서 비어 있으면 기동 시 무작위 키를 쓰므로 재시작하면 다시 로그인해야 한다. 그 밖의 프로필은 키가 없으면 기동하지 않는다. 키 값을 설정 파일에 쓰지 않는다.
+- dev 로그인 `POST /api/v1/dev/login`(사번만)은 `eduhub.auth.dev-login-enabled=true`인 dev·test 프로필에만 있다. 운영 프로필에 dev·test를 넣지 않는다.
+- 관리자 사번 목록은 `eduhub.admin.employee-ids`이며 환경 변수 `EDUHUB_ADMIN_EMPLOYEE_IDS`(쉼표 구분)로 준다. 토큰을 발급할 때 이 목록으로 ADMIN 역할을 정한다. 비어 있으면 관리자가 없다. test 프로필은 `TEST-ADMIN`이지만 OS 환경 변수가 이 값을 덮을 수 있으므로, 관리자 목록에 기대는 테스트는 `@TestPropertySource(properties = "eduhub.admin.employee-ids=TEST-ADMIN")`로 값을 고정한다.
 
 ## 구현 시 유의할 점
 
@@ -56,8 +59,9 @@
 - 취소 후 재신청이 가능하므로(D-05), 중복 신청 방지에 `회차+사용자` 일반 유니크 제약을 쓸 수 없다. MariaDB에는 부분 인덱스도 없으므로 생성 컬럼 `active_session_id`에 유일 제약을 건다(D-19).
 - 신청 동시성은 회차 행 `PESSIMISTIC_WRITE`를 첫 쿼리로 잡고 격리 수준은 `READ_COMMITTED`로 한다(D-20). 수량을 바꾸는 코드는 같은 락을 쓴다. 관리자 `updateSession`·`closeSession`과 신청 취소(`cancel`)도 회차 행 락을 첫 쿼리로 잡고 `READ_COMMITTED`로 실행한다(D-24, D-26).
 - 대기 순서는 `waiting_key`(작을수록 앞, 회차 안에서 유일)로 표현하고, 순번은 조회할 때 "키가 더 작은 대기자 수 + 1"로 계산한다. 새 대기자는 최댓값 + 1, 정원 감소로 강등된 사람은 기존 대기자보다 앞 순번(D-03)이 되도록 최솟값보다 작은 키를 받는다. 대기에서 벗어나면 키를 지운다(D-23).
-- 로그인한 사원의 사번은 컨트롤러 파라미터 `@CurrentEmployee String employeeId`로 받는다(D-27). 리졸버가 지금은 임시 헤더 `X-Employee-Id`를 읽으므로 위조 위험(W2)이 남는다. springdoc이 리졸버 파라미터를 헤더로 인식하지 못하므로 파라미터에는 `@Parameter(hidden = true)`를, 메서드에는 헤더 `@Parameter(in = HEADER)`를 붙인다. 기존 신청·내 신청·취소 엔드포인트는 아직 `@RequestHeader`이며 인증 도입 때 함께 바꾼다.
-- 관리자 전용 신규 API는 사번을 `@CurrentAdmin String adminId`로 받는다(D-29). `@CurrentAdmin`은 `@RequestBody`보다 앞에 선언해야 403이 본문 검증 400보다 먼저 나온다. 기존 과정·회차 관리 API에는 아직 권한 검사가 없고 인증 도입 때 함께 건다.
+- 인증(D-30): Spring Security 리소스 서버가 HS256 JWT를 검증한다. 규칙표는 `common/SecurityConfig`에 있다(공개: `GET /api/v1/courses/**`, `/api/health`, API 문서, dev 로그인, `/api` 밖 경로. 관리자: `/api/v1/admin/**`. 그 밖의 `/api/**`는 인증 필요). 공개 GET 아래에 개인정보를 돌려주는 GET을 만들면 규칙을 좁힌다.
+- 로그인한 사원의 사번은 컨트롤러 파라미터 `@Parameter(hidden = true) @CurrentEmployee String employeeId`로 받는다. 리졸버가 토큰의 `sub`만 읽으며, 사번을 헤더·쿼리·본문으로 받지 않는다. 관리자 판단은 URL 규칙(ADMIN 역할)이 맡는다.
+- 컨트롤러 테스트(`@WebMvcTest`)는 `@Import(WebMvcSecurityTestConfig.class)`로 실제 보안 규칙을 가져오고, `with(employee("E1001"))`·`with(admin("A1"))`(`jwt()` 기반)로 인증을 붙인다. 슬라이스에는 `@ActiveProfiles("test")`를 붙이지 않는다(dev 로그인 빈이 켜진다). 실제 서명·만료·역할 변환은 `SecurityIntegrationTest`가 확인한다.
 - 수료(D-28)는 종료(CLOSED)된 회차에서만 하며, 회차 행 락을 첫 쿼리로 잡고 `READ_COMMITTED`로 실행한다(`enrollment/CompletionService`). `CONFIRMED → COMPLETED`만 있고, 대기자는 바꾸지 않는다. 신청·승급·강등의 확정 수 계산은 `CONFIRMED`만 센다(종료 전 회차에서만 동작하므로 수료가 섞이지 않는다).
 - 목록 조회에서 대기 순번이 필요하면 행마다 `WaitingNumbers.numberOf()`를 부르지 말고, `EnrollmentRepository.findMyEnrollments`처럼 같은 쿼리 안의 서브쿼리로 계산한다(N+1 방지).
 - 신청 취소는 행을 지우지 않고 `CANCELLED`와 `cancelled_at`을 남기며, 교육 시작 후에는 확정·대기 모두 취소할 수 없다(409 `SESSION_STARTED`, D-25).

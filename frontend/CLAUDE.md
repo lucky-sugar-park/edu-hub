@@ -2,12 +2,24 @@
 
 - UI는 MUI로 만든다.
 - API 호출은 OpenAPI 스펙에서 생성한 Axios 클라이언트로만 한다(NFR-04).
-- `CourseApi`, `CourseAdminApi` 인스턴스는 `apps/course-mfe/src/api/courseApi.ts` 한 곳에서만 만들고, 화면은 커스텀 훅을 통해서만 API를 쓴다.
-- 화면 이동은 `react-router-dom`으로 한다. 경로는 `apps/course-mfe/src/App.tsx`에 모은다(`/` 과정 목록, `/courses/:id` 과정 상세, `/admin` 과정 관리, D-18). 라우터를 쓰는 화면의 테스트는 `MemoryRouter`로 감싼다. 경로를 추가하면 백엔드의 `common/SpaForwardController`에도 추가해야 백엔드 배포본에서 주소를 직접 열 수 있다.
+- API 인스턴스(`CourseApi`, `CourseAdminApi`, `EnrollmentApi`, `EnrollmentAdminApi`, `DevAuthApi`)는 `apps/course-mfe/src/api/courseApi.ts` 한 곳에서 같은 Axios 인스턴스로만 만들고, 화면은 커스텀 훅을 통해서만 API를 쓴다. 화면은 axios를 직접 알지 않는다.
+- 화면 이동은 `react-router-dom`으로 한다. 경로는 `apps/course-mfe/src/App.tsx`에 모은다(D-18, D-31).
+  - `/` 과정 목록, `/courses/:id` 과정 상세(신청·취소), `/login` 로그인
+  - `/me/enrollments` 내 신청 내역(`RequireAuth`)
+  - `/admin` 과정 관리, `/admin/sessions/:sessionId/roster` 명단·수료(`RequireAdmin`)
+- 경로를 추가하면 백엔드의 `common/SpaForwardController`에도 추가해야 백엔드 배포본에서 주소를 직접 열 수 있다.
 - 상세 화면의 날짜·시간은 `apps/course-mfe/src/format.ts`의 `formatDateTime`으로 보여 준다. API의 UTC 값을 PC 시간대와 상관없이 한국 시간(Asia/Seoul)으로 바꾼다.
 - 관리 화면의 회차 시작 시각 입력은 PC의 로컬 시간이며, API의 ISO Instant(UTC)와의 변환은 `apps/course-mfe/src/dateTime.ts`를 쓴다.
-- 404를 따로 보여 줘야 하면 훅에서 전용 에러(예: `CourseNotFoundError`)로 바꿔 돌려준다. 화면은 axios를 직접 알지 않는다.
-- 쓰기 요청의 에러는 `useCourseAdmin`이 백엔드 `ErrorResponse.message`를 꺼내 `error`로 돌려준다. 화면은 이를 대화 상자 안의 `Alert`로 보여 준다.
+- 404·403을 따로 보여 줘야 하면 훅에서 전용 에러(예: `CourseNotFoundError`, `SessionForbiddenError`)로 바꿔 돌려준다.
+- 쓰기 요청의 에러는 훅(`useCourseAdmin`, `useEnrollmentActions`, `useCompletion`)이 백엔드 `ErrorResponse.message`를 꺼내 `error`로 돌려준다. 화면은 이를 대화 상자 안이나 화면 위 `Alert`로 보여 준다.
+
+## 인증 (D-30)
+
+- 로그인 상태는 `auth/AuthContext.tsx`의 `useAuth()`(`token`, `employeeId`, `roles`, `isAdmin`, `login`, `logout`)로 쓴다. 토큰은 sessionStorage `eduhub.auth`에 두고, 콘솔·화면·URL에 내보내지 않는다. 오류 객체를 렌더링하지 않는다(요청 config에 토큰이 있다).
+- `courseApi.ts`의 인터셉터가 만료되지 않은 토큰만 붙인다(로그인 요청 제외). 401이면 보낸 토큰이 현재 토큰일 때만 로그아웃하고, 공개 GET(`/api/v1/courses/**`, `/api/health`)은 토큰 없이 한 번 다시 요청하며, 보호 화면(`/me/**`, `/admin/**`)에서만 `/login`으로 보낸다. 백엔드 공개 경로가 바뀌면 `isPublicGet`도 함께 고친다.
+- 로그인 화면은 개발 환경 전용(dev 로그인, 비밀번호 없음)이다. 404면 SSO 안내를 보여 준다.
+- 목록 훅(`useMyEnrollments`, `useSessionRoster`)은 조건이나 토큰이 바뀐 렌더에서 낡은 데이터 대신 로딩을 돌려주고, `reload` 실패 시에는 기존 데이터를 유지한다. 새 목록 훅도 같은 규칙을 따른다.
+- 화면 테스트는 `test-utils.tsx`의 `renderWithProviders`(`MemoryRouter`와 `AuthProvider`, 로그인 상태는 `fakeAuth`)로 감싼다.
 
 ## 명령
 
