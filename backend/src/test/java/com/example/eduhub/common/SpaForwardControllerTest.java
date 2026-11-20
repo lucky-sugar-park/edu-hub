@@ -7,11 +7,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(SpaForwardController.class)
-@ActiveProfiles("test")
+@Import(WebMvcSecurityTestConfig.class)
 class SpaForwardControllerTest {
 
   @Autowired private MockMvc mockMvc;
@@ -28,6 +28,30 @@ class SpaForwardControllerTest {
   void courseDetailScreenForwardsToIndex() throws Exception {
     mockMvc
         .perform(get("/courses/39"))
+        .andExpect(status().isOk())
+        .andExpect(forwardedUrl("/index.html"));
+  }
+
+  @Test
+  void loginScreenForwardsToIndex() throws Exception {
+    mockMvc
+        .perform(get("/login"))
+        .andExpect(status().isOk())
+        .andExpect(forwardedUrl("/index.html"));
+  }
+
+  @Test
+  void myEnrollmentsScreenForwardsToIndex() throws Exception {
+    mockMvc
+        .perform(get("/me/enrollments"))
+        .andExpect(status().isOk())
+        .andExpect(forwardedUrl("/index.html"));
+  }
+
+  @Test
+  void rosterScreenForwardsToIndex() throws Exception {
+    mockMvc
+        .perform(get("/admin/sessions/12/roster"))
         .andExpect(status().isOk())
         .andExpect(forwardedUrl("/index.html"));
   }

@@ -136,6 +136,13 @@ class MyEnrollmentsQueryCountTest {
         .extracting(MyEnrollmentResponse::courseTitle)
         .containsExactly("QC-과정3", "QC-과정3", "QC-과정2", "QC-과정1");
     assertThat(response.content())
+        .extracting(MyEnrollmentResponse::courseId)
+        .containsExactly(
+            courses.get(2).getId(),
+            courses.get(2).getId(),
+            courses.get(1).getId(),
+            courses.get(0).getId());
+    assertThat(response.content())
         .extracting(MyEnrollmentResponse::sessionPlace)
         .containsExactly("QC-장소4", "QC-장소3", "QC-장소2", "QC-장소1");
     assertThat(response.content())
@@ -166,6 +173,23 @@ class MyEnrollmentsQueryCountTest {
     assertThat(response.content())
         .extracting(MyEnrollmentResponse::waitingNumber)
         .containsExactly(3, 2);
+  }
+
+  @Test
+  void rosterWithinTwoStatementsIncludingCourseFields() {
+    CourseSession target = sessions.get(3);
+    Statistics statistics = statistics();
+    statistics.clear();
+
+    SessionRosterResponse roster = service.getRoster(target.getId());
+
+    // 회차 + 과정 fetch join 1, 신청 1
+    assertThat(statistics.getPrepareStatementCount()).isEqualTo(2L);
+    assertThat(roster.courseId()).isEqualTo(courses.get(2).getId());
+    assertThat(roster.courseTitle()).isEqualTo("QC-과정3");
+    assertThat(roster.startAt()).isEqualTo(START_AT);
+    assertThat(roster.place()).isEqualTo("QC-장소4");
+    assertThat(roster.confirmed()).hasSize(1);
   }
 
   private Statistics statistics() {

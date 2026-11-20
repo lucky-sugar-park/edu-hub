@@ -1,9 +1,10 @@
 import type { CourseDetailResponse } from "@eduhub/api-client";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { type UseCourseAdminResult, useCourseAdmin } from "../hooks/useCourseAdmin";
 import { useCourseDetail } from "../hooks/useCourseDetail";
 import { useCourses } from "../hooks/useCourses";
+import { renderWithProviders } from "../test-utils";
 import { AdminCoursePage } from "./AdminCoursePage";
 
 vi.mock("../hooks/useCourses", () => ({ useCourses: vi.fn() }));
@@ -90,7 +91,7 @@ function sessionRow(place: string) {
 }
 
 it("과정을 고르면 상세와 회차를 보여 준다", () => {
-  render(<AdminCoursePage />);
+  renderWithProviders(<AdminCoursePage />);
   expect(screen.getByText("과정을 선택하면 회차를 관리할 수 있습니다.")).toBeInTheDocument();
 
   const section = selectCourse();
@@ -101,7 +102,7 @@ it("과정을 고르면 상세와 회차를 보여 준다", () => {
 });
 
 it("시작한 회차만 종료할 수 있다", () => {
-  render(<AdminCoursePage />);
+  renderWithProviders(<AdminCoursePage />);
   selectCourse();
 
   expect(within(sessionRow("본사 3층")).getByRole("button", { name: "종료" })).toBeEnabled();
@@ -109,7 +110,7 @@ it("시작한 회차만 종료할 수 있다", () => {
 });
 
 it("회차 종료를 확인하면 API를 부르고 다시 불러온다", async () => {
-  render(<AdminCoursePage />);
+  renderWithProviders(<AdminCoursePage />);
   selectCourse();
 
   fireEvent.click(within(sessionRow("본사 3층")).getByRole("button", { name: "종료" }));
@@ -123,7 +124,7 @@ it("회차 종료를 확인하면 API를 부르고 다시 불러온다", async (
 });
 
 it("과정을 등록한다", async () => {
-  render(<AdminCoursePage />);
+  renderWithProviders(<AdminCoursePage />);
 
   fireEvent.click(screen.getByRole("button", { name: "과정 등록" }));
   const dialog = screen.getByRole("dialog");
@@ -143,7 +144,7 @@ it("과정을 등록한다", async () => {
 });
 
 it("과정 수정 폼에 기존 값을 채운다", async () => {
-  render(<AdminCoursePage />);
+  renderWithProviders(<AdminCoursePage />);
   selectCourse();
 
   fireEvent.click(screen.getByRole("button", { name: "과정 수정" }));
@@ -162,7 +163,7 @@ it("과정 수정 폼에 기존 값을 채운다", async () => {
 });
 
 it("시작한 회차를 수정할 때는 정원과 시작 시각을 막고 원래 시작 시각을 보낸다", async () => {
-  render(<AdminCoursePage />);
+  renderWithProviders(<AdminCoursePage />);
   selectCourse();
 
   fireEvent.click(within(sessionRow("본사 3층")).getByRole("button", { name: "수정" }));
@@ -182,7 +183,7 @@ it("시작한 회차를 수정할 때는 정원과 시작 시각을 막고 원�
 });
 
 it("회차를 등록한다", async () => {
-  render(<AdminCoursePage />);
+  renderWithProviders(<AdminCoursePage />);
   selectCourse();
 
   fireEvent.click(screen.getByRole("button", { name: "회차 등록" }));
@@ -208,7 +209,7 @@ it("요청이 실패하면 대화 상자에 서버 메시지를 보여 주고 �
     error: "종료된 과정입니다: 1",
     updateCourse: vi.fn().mockResolvedValue(null),
   });
-  render(<AdminCoursePage />);
+  renderWithProviders(<AdminCoursePage />);
   selectCourse();
 
   fireEvent.click(screen.getByRole("button", { name: "과정 수정" }));
@@ -224,7 +225,7 @@ it("요청이 실패하면 대화 상자에 서버 메시지를 보여 주고 �
 
 it("종료된 과정은 수정, 종료, 회차 등록을 막는다", () => {
   givenDetail({ ...openCourse, id: 3, title: "리더십", status: "CLOSED" });
-  render(<AdminCoursePage />);
+  renderWithProviders(<AdminCoursePage />);
 
   const section = selectCourse("리더십");
 
@@ -238,7 +239,19 @@ it("종료된 과정은 수정, 종료, 회차 등록을 막는다", () => {
 it("목록을 불러오지 못하면 에러를 보여 준다", () => {
   mockedUseCourses.mockReturnValue({ data: null, loading: false, error: new Error("x"), reload: vi.fn() });
 
-  render(<AdminCoursePage />);
+  renderWithProviders(<AdminCoursePage />);
 
   expect(screen.getByRole("alert")).toHaveTextContent("과정 목록을 불러오지 못했습니다.");
+});
+
+it("회차 표의 '명단' 링크는 명단 화면을 가리킨다", () => {
+  renderWithProviders(<AdminCoursePage />);
+  const section = selectCourse();
+
+  const links = within(section).getAllByRole("link", { name: "명단" });
+
+  expect(links.map((link) => link.getAttribute("href"))).toEqual([
+    "/admin/sessions/10/roster",
+    "/admin/sessions/11/roster",
+  ]);
 });

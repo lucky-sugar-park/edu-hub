@@ -38,6 +38,7 @@ class EnrollmentQueryServiceTest {
   private static final Instant NOW = Instant.parse("2026-11-12T00:00:00Z");
   private static final Long SESSION_ID = 3L;
   private static final String EMPLOYEE_ID = "E1001";
+  private static final long COURSE_ID = 77L;
 
   @Mock private CourseSessionRepository courseSessionRepository;
   @Mock private EnrollmentRepository enrollmentRepository;
@@ -52,7 +53,9 @@ class EnrollmentQueryServiceTest {
             courseSessionRepository,
             enrollmentRepository,
             new WaitingNumbers(enrollmentRepository));
-    session = new CourseSession(new Course("JPA 입문", "개발", null), NOW.plusSeconds(3600), "강의실", 5);
+    Course course = new Course("JPA 입문", "개발", null);
+    ReflectionTestUtils.setField(course, "id", COURSE_ID);
+    session = new CourseSession(course, NOW.plusSeconds(3600), "강의실", 5);
     ReflectionTestUtils.setField(session, "id", SESSION_ID);
   }
 
@@ -115,9 +118,10 @@ class EnrollmentQueryServiceTest {
   void myEnrollmentsDropsClientSortAndConvertsRows() {
     Instant start = NOW.plusSeconds(3600);
     var waitingRow =
-        new MyEnrollmentRow(2L, "JPA 입문", 3L, start, "강의실", EnrollmentStatus.WAITING, 4L, NOW);
+        new MyEnrollmentRow(2L, 9L, "JPA 입문", 3L, start, "강의실", EnrollmentStatus.WAITING, 4L, NOW);
     var confirmedRow =
-        new MyEnrollmentRow(1L, "JPA 입문", 4L, start, "강의실", EnrollmentStatus.CONFIRMED, null, NOW);
+        new MyEnrollmentRow(
+            1L, 8L, "JPA 입문", 4L, start, "강의실", EnrollmentStatus.CONFIRMED, null, NOW);
     Pageable requested = PageRequest.of(1, 5, Sort.by(Sort.Direction.ASC, "id"));
     given(enrollmentRepository.findMyEnrollments(eq(EMPLOYEE_ID), eq(null), any()))
         .willReturn(new PageImpl<>(List.of(waitingRow, confirmedRow), PageRequest.of(1, 5), 7));
@@ -135,6 +139,8 @@ class EnrollmentQueryServiceTest {
     assertThat(response.content()).hasSize(2);
     assertThat(response.content().get(0).waitingNumber()).isEqualTo(4);
     assertThat(response.content().get(0).courseTitle()).isEqualTo("JPA 입문");
+    assertThat(response.content().get(0).courseId()).isEqualTo(9L);
+    assertThat(response.content().get(1).courseId()).isEqualTo(8L);
     assertThat(response.content().get(0).sessionStartAt()).isEqualTo(start);
     assertThat(response.content().get(1).waitingNumber()).isNull();
   }
@@ -173,7 +179,7 @@ class EnrollmentQueryServiceTest {
   }
 
   private void givenRoster(Enrollment... rows) {
-    given(courseSessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
+    given(courseSessionRepository.findByIdWithCourse(SESSION_ID)).willReturn(Optional.of(session));
     given(enrollmentRepository.findBySessionIdAndStatusIn(eq(SESSION_ID), any()))
         .willReturn(List.of(rows));
   }
@@ -190,6 +196,10 @@ class EnrollmentQueryServiceTest {
     SessionRosterResponse roster = service.getRoster(SESSION_ID);
 
     assertThat(roster.sessionId()).isEqualTo(SESSION_ID);
+    assertThat(roster.courseId()).isEqualTo(COURSE_ID);
+    assertThat(roster.courseTitle()).isEqualTo("JPA 입문");
+    assertThat(roster.startAt()).isEqualTo(NOW.plusSeconds(3600));
+    assertThat(roster.place()).isEqualTo("강의실");
     assertThat(roster.capacity()).isEqualTo(5);
     assertThat(roster.sessionStatus()).isEqualTo(CourseSessionStatus.OPEN);
     assertThat(roster.confirmed())
@@ -265,7 +275,7 @@ class EnrollmentQueryServiceTest {
 
   @Test
   void rosterThrowsWhenSessionNotFound() {
-    given(courseSessionRepository.findById(SESSION_ID)).willReturn(Optional.empty());
+    given(courseSessionRepository.findByIdWithCourse(SESSION_ID)).willReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.getRoster(SESSION_ID))
         .isInstanceOf(SessionNotFoundException.class);

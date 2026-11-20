@@ -1,5 +1,6 @@
 package com.example.eduhub.course;
 
+import static com.example.eduhub.common.WebMvcSecurityTestConfig.employee;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -12,18 +13,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.eduhub.common.ConflictException;
 import com.example.eduhub.common.InvalidRequestException;
+import com.example.eduhub.common.WebMvcSecurityTestConfig;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(CourseAdminController.class)
-@ActiveProfiles("test")
+@Import(WebMvcSecurityTestConfig.class)
+// 기본은 관리자 로그인 상태다. 권한 테스트는 요청마다 다른 인증을 준다.
+@WithMockUser(
+    username = "TEST-ADMIN",
+    roles = {"EMPLOYEE", "ADMIN"})
 class CourseAdminControllerTest {
 
   private static final Instant START = Instant.parse("2026-12-01T01:00:00Z");
@@ -31,6 +39,43 @@ class CourseAdminControllerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private CourseCommandService courseCommandService;
+
+  @Test
+  @WithAnonymousUser
+  void adminApisRejectAnonymousWith401() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/admin/courses")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"t\",\"category\":\"c\"}"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    mockMvc.perform(post("/api/v1/admin/sessions/1/close")).andExpect(status().isUnauthorized());
+    verifyNoInteractions(courseCommandService);
+  }
+
+  @Test
+  void adminApisRejectEmployeeWith403() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/admin/courses")
+                .with(employee("E1001"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"t\",\"category\":\"c\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    mockMvc
+        .perform(post("/api/v1/admin/sessions/1/close").with(employee("E1001")))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            put("/api/v1/admin/courses/1")
+                .with(employee("E1001"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isForbidden());
+    verifyNoInteractions(courseCommandService);
+  }
 
   @Test
   void createCourseReturnsCreated() throws Exception {

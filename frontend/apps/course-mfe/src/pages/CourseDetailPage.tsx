@@ -16,6 +16,12 @@ import {
   Typography,
 } from "@mui/material";
 import { Link as RouterLink, useParams } from "react-router-dom";
+import {
+  SessionEnrollmentCells,
+  SessionEnrollmentHeadCells,
+  SessionEnrollmentNotices,
+  useSessionEnrollments,
+} from "../enrollment";
 import { formatDateTime } from "../format";
 import { CourseNotFoundError, useCourse } from "../hooks/useCourse";
 import { statusLabel } from "../statusLabels";
@@ -23,8 +29,9 @@ import { statusLabel } from "../statusLabels";
 export function CourseDetailPage() {
   const { id } = useParams();
   // 숫자가 아니면 NaN이 되고, 훅이 요청 없이 "과정 없음"으로 처리한다.
-  const { data: course, loading, error } = useCourse(Number(id));
+  const { data: course, loading, error, reload: reloadCourse } = useCourse(Number(id));
   const sessions = course?.sessions ?? [];
+  const enrollments = useSessionEnrollments(course, reloadCourse);
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -39,12 +46,16 @@ export function CourseDetailPage() {
       )}
 
       {!loading && error instanceof CourseNotFoundError && (
-        <Alert severity="warning">과정을 찾을 수 없습니다. 삭제되었거나 주소가 잘못되었습니다.</Alert>
+        <Alert severity="warning">
+          과정을 찾을 수 없습니다. 삭제되었거나 주소가 잘못되었습니다.
+        </Alert>
       )}
 
       {!loading && error && !(error instanceof CourseNotFoundError) && (
         <Alert severity="error">과정 정보를 불러오지 못했습니다.</Alert>
       )}
+
+      <SessionEnrollmentNotices enrollments={enrollments} />
 
       {!loading && course && (
         <>
@@ -74,6 +85,7 @@ export function CourseDetailPage() {
                     <TableCell align="right">정원</TableCell>
                     <TableCell align="right">남은 자리</TableCell>
                     <TableCell>상태</TableCell>
+                    <SessionEnrollmentHeadCells />
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -84,11 +96,16 @@ export function CourseDetailPage() {
                       <TableCell align="right">{session.capacity}</TableCell>
                       <TableCell align="right">{session.remainingSeats}</TableCell>
                       <TableCell>{statusLabel(session.status)}</TableCell>
+                      <SessionEnrollmentCells
+                        enrollments={enrollments}
+                        course={course}
+                        session={session}
+                      />
                     </TableRow>
                   ))}
                   {sessions.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} align="center">
+                      <TableCell colSpan={7} align="center">
                         등록된 회차가 없습니다.
                       </TableCell>
                     </TableRow>

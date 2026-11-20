@@ -57,6 +57,10 @@ class EnrollmentRosterIntegrationTest {
     SessionRosterResponse roster = service.getRoster(session.getId());
 
     assertThat(roster.sessionId()).isEqualTo(session.getId());
+    assertThat(roster.courseId()).isEqualTo(course.getId());
+    assertThat(roster.courseTitle()).isEqualTo("JPA 입문");
+    assertThat(roster.startAt()).isEqualTo(START_AT);
+    assertThat(roster.place()).isEqualTo("본사 3층");
     assertThat(roster.capacity()).isEqualTo(7);
     assertThat(roster.sessionStatus()).isEqualTo(CourseSessionStatus.OPEN);
 

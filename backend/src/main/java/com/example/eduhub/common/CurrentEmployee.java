@@ -7,9 +7,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * 로그인한 사원의 사번. 인증(D-11) 전에는 {@code X-Employee-Id} 헤더(D-21)에서 읽는다.
+ * 로그인한 사원의 사번. 토큰의 {@code sub}에서 읽는다(D-30, {@link CurrentEmployeeArgumentResolver}).
  *
- * <p>인증 전에는 클라이언트가 헤더 값을 마음대로 보낼 수 있어 위조 위험(FR-04 최종 검토 W2)이 남는다.
+ * <p>클라이언트가 값을 정할 수 없다. OpenAPI에는 파라미터로 나타나지 않도록 {@code @Parameter(hidden = true)}와 함께 쓴다.
  */
 @Target(ElementType.PARAMETER)
 @Retention(RetentionPolicy.RUNTIME)

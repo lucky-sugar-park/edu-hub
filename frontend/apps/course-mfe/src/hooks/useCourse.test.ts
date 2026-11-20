@@ -82,3 +82,65 @@ it("id가 바뀐 뒤 늦게 도착한 이전 응답은 무시한다", async () =
 
   expect(result.current.data).toEqual(course(2));
 });
+
+it("reload는 로딩 표시 없이 다시 불러오고, 실패하면 기존 값을 유지한다", async () => {
+  getCourse.mockResolvedValue({ data: course(7) } as GetCourseResponse);
+  const { result } = renderHook(() => useCourse(7));
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  getCourse.mockResolvedValue({ data: { ...course(7), title: "새 제목" } } as GetCourseResponse);
+  act(() => result.current.reload());
+  expect(result.current.loading).toBe(false);
+  await waitFor(() => expect(result.current.data?.title).toBe("새 제목"));
+
+  getCourse.mockRejectedValue(new Error("boom"));
+  act(() => result.current.reload());
+  await waitFor(() => expect(getCourse).toHaveBeenCalledTimes(3));
+  expect(result.current.data?.title).toBe("새 제목");
+  expect(result.current.error).toBeNull();
+});
+
+it("id가 바뀐 뒤 늦게 도착한 reload 응답은 무시한다", async () => {
+  getCourse.mockResolvedValue({ data: course(7) } as GetCourseResponse);
+  const { result, rerender } = renderHook(({ id }) => useCourse(id), { initialProps: { id: 7 } });
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  let resolveLate: (value: GetCourseResponse) => void = () => {};
+  getCourse.mockReturnValueOnce(
+    new Promise((r) => (resolveLate = r)) as ReturnType<typeof getCourse>,
+  );
+  act(() => result.current.reload());
+
+  getCourse.mockResolvedValue({ data: course(8) } as GetCourseResponse);
+  rerender({ id: 8 });
+  await waitFor(() => expect(result.current.data?.id).toBe(8));
+
+  await act(async () => {
+    resolveLate({ data: { ...course(7), title: "늦은 응답" } } as GetCourseResponse);
+  });
+  expect(result.current.data?.id).toBe(8);
+});
+
+it("reload를 연속으로 호출하면 마지막 요청의 응답만 반영한다", async () => {
+  getCourse.mockResolvedValue({ data: course(7) } as GetCourseResponse);
+  const { result } = renderHook(() => useCourse(7));
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  let resolveFirst: (value: GetCourseResponse) => void = () => {};
+  let resolveSecond: (value: GetCourseResponse) => void = () => {};
+  getCourse
+    .mockReturnValueOnce(new Promise((r) => (resolveFirst = r)) as ReturnType<typeof getCourse>)
+    .mockReturnValueOnce(new Promise((r) => (resolveSecond = r)) as ReturnType<typeof getCourse>);
+  act(() => result.current.reload());
+  act(() => result.current.reload());
+
+  // 응답 순서가 뒤집힌다: 두 번째가 먼저, 첫 번째가 나중에 도착한다.
+  await act(async () => {
+    resolveSecond({ data: { ...course(7), title: "두 번째" } } as GetCourseResponse);
+  });
+  await act(async () => {
+    resolveFirst({ data: { ...course(7), title: "첫 번째" } } as GetCourseResponse);
+  });
+
+  expect(result.current.data?.title).toBe("두 번째");
+});

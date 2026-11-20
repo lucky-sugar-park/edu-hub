@@ -1,20 +1,12 @@
 import type {
   CourseDetailResponse,
   CourseRequest,
-  ErrorResponse,
   SessionRequest,
   SessionResponse,
 } from "@eduhub/api-client";
 import { useCallback, useMemo, useState } from "react";
 import { courseAdminApi } from "../api/courseApi";
-
-const FALLBACK_MESSAGE = "요청을 처리하지 못했습니다.";
-
-/** 백엔드 ErrorResponse의 message를 꺼낸다. 응답이 없으면(네트워크 오류 등) 기본 문구를 쓴다. */
-export function toErrorMessage(cause: unknown): string {
-  const body = (cause as { response?: { data?: ErrorResponse } } | null)?.response?.data;
-  return body?.message || FALLBACK_MESSAGE;
-}
+import { toErrorMessage } from "../api/errors";
 
 export interface UseCourseAdminResult {
   submitting: boolean;

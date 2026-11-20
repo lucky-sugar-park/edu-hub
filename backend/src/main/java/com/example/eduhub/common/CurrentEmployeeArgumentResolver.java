@@ -1,18 +1,22 @@
 package com.example.eduhub.common;
 
 import org.springframework.core.MethodParameter;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
-/** {@link CurrentEmployee} 파라미터에 사번을 채운다. */
+/**
+ * {@link CurrentEmployee} 파라미터에 로그인한 사원의 사번(토큰의 {@code sub})을 채운다(D-30).
+ *
+ * <p>보안 필터 체인이 인증 없는 요청을 먼저 막으므로, 인증이 없을 때의 예외는 방어용이다. 예외는 보안 체인의 401 처리({@code
+ * ExceptionTranslationFilter})가 받는다.
+ */
 public class CurrentEmployeeArgumentResolver implements HandlerMethodArgumentResolver {
-
-  // TODO(NFR-03): 인증 도입 후 인증 정보에서 사번을 꺼낸다
-  public static final String EMPLOYEE_ID_HEADER = "X-Employee-Id";
-
-  private static final int MAX_LENGTH = 20;
 
   @Override
   public boolean supportsParameter(MethodParameter parameter) {
@@ -26,18 +30,14 @@ public class CurrentEmployeeArgumentResolver implements HandlerMethodArgumentRes
       ModelAndViewContainer mavContainer,
       NativeWebRequest webRequest,
       WebDataBinderFactory binderFactory) {
-    return readEmployeeId(webRequest);
-  }
-
-  /** 사번 헤더를 읽고 검사한다. 관리자 리졸버도 같은 규칙을 쓴다. */
-  static String readEmployeeId(NativeWebRequest webRequest) {
-    String value = webRequest.getHeader(EMPLOYEE_ID_HEADER);
-    if (value == null || value.trim().isEmpty()) {
-      throw new InvalidRequestException(EMPLOYEE_ID_HEADER + ": 사번이 필요합니다");
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (!(authentication instanceof JwtAuthenticationToken token) || !token.isAuthenticated()) {
+      throw new AuthenticationCredentialsNotFoundException("인증 정보가 없습니다");
     }
-    if (value.length() > MAX_LENGTH) {
-      throw new InvalidRequestException(EMPLOYEE_ID_HEADER + ": 20자 이하여야 합니다");
+    String employeeId = token.getName();
+    if (employeeId == null || employeeId.isBlank()) {
+      throw new AuthenticationCredentialsNotFoundException("토큰에 사번이 없습니다");
     }
-    return value;
+    return employeeId;
   }
 }

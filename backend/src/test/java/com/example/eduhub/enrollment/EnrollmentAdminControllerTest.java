@@ -1,5 +1,7 @@
 package com.example.eduhub.enrollment;
 
+import static com.example.eduhub.common.WebMvcSecurityTestConfig.admin;
+import static com.example.eduhub.common.WebMvcSecurityTestConfig.employee;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
@@ -11,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.eduhub.common.ConflictException;
+import com.example.eduhub.common.WebMvcSecurityTestConfig;
 import com.example.eduhub.course.CourseSessionStatus;
 import com.example.eduhub.course.SessionNotFoundException;
 import java.time.Instant;
@@ -20,24 +23,22 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @WebMvcTest(EnrollmentAdminController.class)
-@ActiveProfiles("test")
-// OS 환경 변수(EDUHUB_ADMIN_EMPLOYEE_IDS)가 yml 값을 덮을 수 있으므로 테스트에서 값을 고정한다.
-@TestPropertySource(properties = "eduhub.admin.employee-ids=TEST-ADMIN")
+@Import(WebMvcSecurityTestConfig.class)
 class EnrollmentAdminControllerTest {
 
   private static final String ROSTER_URL = "/api/v1/admin/sessions/3/roster";
   private static final String COMPLETIONS_URL = "/api/v1/admin/sessions/3/completions";
-  private static final String HEADER = "X-Employee-Id";
-  private static final String ADMIN = "TEST-ADMIN";
+  private static final RequestPostProcessor ADMIN = admin("TEST-ADMIN");
+  private static final RequestPostProcessor EMPLOYEE = employee("E1001");
   private static final Instant T0 = Instant.parse("2026-11-12T01:00:00Z");
 
   @Autowired private MockMvc mockMvc;
@@ -45,11 +46,12 @@ class EnrollmentAdminControllerTest {
   @MockitoBean private EnrollmentQueryService enrollmentQueryService;
   @MockitoBean private CompletionService completionService;
 
-  private MockHttpServletRequestBuilder complete(String employeeId, String body) {
+  /** auth가 null이면 토큰 없이 보낸다. */
+  private MockHttpServletRequestBuilder complete(RequestPostProcessor auth, String body) {
     MockHttpServletRequestBuilder builder =
         post(COMPLETIONS_URL).contentType(MediaType.APPLICATION_JSON);
-    if (employeeId != null) {
-      builder.header(HEADER, employeeId);
+    if (auth != null) {
+      builder.with(auth);
     }
     return body == null ? builder : builder.content(body);
   }
@@ -66,6 +68,10 @@ class EnrollmentAdminControllerTest {
         .willReturn(
             new SessionRosterResponse(
                 3L,
+                5L,
+                "JPA 입문",
+                T0,
+                "본사 3층",
                 10,
                 CourseSessionStatus.CLOSED,
                 List.of(
@@ -76,9 +82,13 @@ class EnrollmentAdminControllerTest {
                 List.of(new SessionRosterResponse.WaitingEntry(5L, "W1", 1, T0))));
 
     mockMvc
-        .perform(get(ROSTER_URL).header(HEADER, ADMIN))
+        .perform(get(ROSTER_URL).with(ADMIN))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.sessionId").value(3))
+        .andExpect(jsonPath("$.courseId").value(5))
+        .andExpect(jsonPath("$.courseTitle").value("JPA 입문"))
+        .andExpect(jsonPath("$.startAt").value("2026-11-12T01:00:00Z"))
+        .andExpect(jsonPath("$.place").value("본사 3층"))
         .andExpect(jsonPath("$.capacity").value(10))
         .andExpect(jsonPath("$.sessionStatus").value("CLOSED"))
         .andExpect(jsonPath("$.confirmed[0].enrollmentId").value(1))
@@ -95,7 +105,7 @@ class EnrollmentAdminControllerTest {
   @Test
   void rosterRejectsNonAdminWith403WithoutCallingService() throws Exception {
     mockMvc
-        .perform(get(ROSTER_URL).header(HEADER, "E1001"))
+        .perform(get(ROSTER_URL).with(EMPLOYEE))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("FORBIDDEN"));
 
@@ -103,11 +113,11 @@ class EnrollmentAdminControllerTest {
   }
 
   @Test
-  void rosterRejectsMissingHeaderWith400() throws Exception {
+  void rosterRejectsMissingTokenWith401() throws Exception {
     mockMvc
         .perform(get(ROSTER_URL))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 
     verifyNoInteractions(enrollmentQueryService);
   }
@@ -117,7 +127,7 @@ class EnrollmentAdminControllerTest {
     given(enrollmentQueryService.getRoster(3L)).willThrow(new SessionNotFoundException(3L));
 
     mockMvc
-        .perform(get(ROSTER_URL).header(HEADER, ADMIN))
+        .perform(get(ROSTER_URL).with(ADMIN))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("NOT_FOUND"));
   }
@@ -144,7 +154,7 @@ class EnrollmentAdminControllerTest {
   @Test
   void completeRejectsNonAdminWith403WithoutCallingService() throws Exception {
     mockMvc
-        .perform(complete("E1001", "{\"employeeIds\":[\"E1\"]}"))
+        .perform(complete(EMPLOYEE, "{\"employeeIds\":[\"E1\"]}"))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("FORBIDDEN"));
 
@@ -152,24 +162,24 @@ class EnrollmentAdminControllerTest {
   }
 
   @Test
-  void completeRejectsMissingHeaderWith400() throws Exception {
+  void completeRejectsMissingTokenWith401() throws Exception {
     mockMvc
         .perform(complete(null, "{\"employeeIds\":[\"E1\"]}"))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 
     verifyNoInteractions(completionService);
   }
 
   @Test
-  void adminCheckComesBeforeBodyValidation() throws Exception {
-    // 비관리자가 잘못된 본문을 보내도 400이 아니라 403이다(설계 3.2의 검사 순서).
+  void adminRoleIsCheckedBeforeBodyValidation() throws Exception {
+    // 비관리자가 잘못된 본문을 보내도 400이 아니라 403이다(보안 필터가 컨트롤러보다 먼저 막는다).
     mockMvc
-        .perform(complete("E1001", "{\"employeeIds\":[]}"))
+        .perform(complete(EMPLOYEE, "{\"employeeIds\":[]}"))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     mockMvc
-        .perform(complete("E1001", null))
+        .perform(complete(EMPLOYEE, null))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("FORBIDDEN"));
 
@@ -177,11 +187,11 @@ class EnrollmentAdminControllerTest {
   }
 
   @Test
-  void headerCheckComesBeforeBodyValidation() throws Exception {
+  void missingTokenWithInvalidBodyIsStill401() throws Exception {
     mockMvc
         .perform(complete(null, "{\"employeeIds\":[]}"))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message").value("X-Employee-Id: 사번이 필요합니다"));
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 
     verifyNoInteractions(completionService);
   }

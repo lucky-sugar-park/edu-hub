@@ -56,7 +56,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
   @Query(
       value =
           "select new com.example.eduhub.enrollment.MyEnrollmentRow("
-              + "e.id, c.title, s.id, s.startAt, s.place, e.status, "
+              + "e.id, c.id, c.title, s.id, s.startAt, s.place, e.status, "
               + "case when e.status = 'WAITING' then "
               + "(select count(w) + 1 from Enrollment w "
               + "where w.session = s and w.status = 'WAITING' and w.waitingKey < e.waitingKey) "

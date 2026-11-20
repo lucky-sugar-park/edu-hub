@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { useCourses } from "../hooks/useCourses";
+import { renderWithProviders } from "../test-utils";
 import { CourseListPage } from "./CourseListPage";
 
 vi.mock("../hooks/useCourses", () => ({
@@ -11,11 +11,7 @@ vi.mock("../hooks/useCourses", () => ({
 const mockedUseCourses = vi.mocked(useCourses);
 
 function renderPage() {
-  render(
-    <MemoryRouter>
-      <CourseListPage />
-    </MemoryRouter>,
-  );
+  renderWithProviders(<CourseListPage />);
 }
 
 it("목록을 표에 보여 준다", () => {
