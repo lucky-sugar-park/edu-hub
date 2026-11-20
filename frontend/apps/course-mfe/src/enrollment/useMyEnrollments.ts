@@ -1,6 +1,9 @@
-import type { GetMyEnrollmentsStatusEnum, PageResponseMyEnrollmentResponse } from "@eduhub/api-client";
+import type {
+  GetMyEnrollmentsStatusEnum,
+  PageResponseMyEnrollmentResponse,
+} from "@eduhub/api-client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { enrollmentApi } from "../api/courseApi";
+import { enrollmentApi } from "../api/clients";
 import { useAuth } from "../auth/AuthContext";
 
 export interface UseMyEnrollmentsResult {
@@ -73,7 +76,12 @@ export function useMyEnrollments(
     lastToken.current !== token || lastQuery.current !== `${status ?? ""}|${page}|${size}`;
 
   if (!loggedIn) {
-    return { data: { content: [], page, size, totalElements: 0 }, loading: false, error: null, reload };
+    return {
+      data: { content: [], page, size, totalElements: 0 },
+      loading: false,
+      error: null,
+      reload,
+    };
   }
   if (stale) return { data: null, loading: true, error: null, reload };
   return { data, loading, error, reload };

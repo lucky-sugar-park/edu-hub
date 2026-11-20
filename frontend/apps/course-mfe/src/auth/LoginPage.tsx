@@ -1,8 +1,8 @@
 import { Alert, Box, Button, Container, Paper, TextField, Typography } from "@mui/material";
 import { type FormEvent, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { DevLoginUnavailableError, useAuth } from "../auth/AuthContext";
-import { toErrorMessage } from "../hooks/useCourseAdmin";
+import { DevLoginUnavailableError, useAuth } from "./AuthContext";
+import { toErrorMessage } from "../api/errors";
 
 const SSO_MESSAGE = "이 환경에서는 사내 SSO 연동 전까지 로그인할 수 없습니다";
 

@@ -1,13 +1,13 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { enrollmentAdminApi } from "../api/courseApi";
+import { adminEnrollmentApi } from "../api/clients";
 import { useCompletion } from "./useCompletion";
 
-vi.mock("../api/courseApi", () => ({
-  enrollmentAdminApi: { complete: vi.fn() },
+vi.mock("../api/clients", () => ({
+  adminEnrollmentApi: { complete: vi.fn() },
 }));
 
-const api = vi.mocked(enrollmentAdminApi);
+const api = vi.mocked(adminEnrollmentApi);
 type Response = Awaited<ReturnType<typeof api.complete>>;
 
 beforeEach(() => vi.resetAllMocks());

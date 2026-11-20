@@ -1,9 +1,9 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { enrollmentApi } from "../api/courseApi";
+import { enrollmentApi } from "../api/clients";
 import { useEnrollmentActions } from "./useEnrollmentActions";
 
-vi.mock("../api/courseApi", () => ({
+vi.mock("../api/clients", () => ({
   enrollmentApi: { enroll: vi.fn(), cancel: vi.fn() },
 }));
 

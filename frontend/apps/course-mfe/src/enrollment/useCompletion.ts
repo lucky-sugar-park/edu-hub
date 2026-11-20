@@ -1,7 +1,7 @@
 import type { CompletionResponse } from "@eduhub/api-client";
 import { useCallback, useMemo, useState } from "react";
-import { enrollmentAdminApi } from "../api/courseApi";
-import { toErrorMessage } from "./useCourseAdmin";
+import { adminEnrollmentApi } from "../api/clients";
+import { toErrorMessage } from "../api/errors";
 
 export interface UseCompletionResult {
   submitting: boolean;
@@ -22,7 +22,7 @@ export function useCompletion(): UseCompletionResult {
     setSubmitting(true);
     setError(null);
     try {
-      return (await enrollmentAdminApi.complete(sessionId, { employeeIds })).data;
+      return (await adminEnrollmentApi.complete(sessionId, { employeeIds })).data;
     } catch (cause) {
       setError(toErrorMessage(cause));
       return null;

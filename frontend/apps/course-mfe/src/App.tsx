@@ -10,13 +10,12 @@ import {
 } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { RequireAdmin } from "./auth/RequireAdmin";
+import { LoginPage } from "./auth/LoginPage";
 import { RequireAuth } from "./auth/RequireAuth";
+import { MyEnrollmentsPage, SessionRosterPage } from "./enrollment";
 import { AdminCoursePage } from "./pages/AdminCoursePage";
 import { CourseDetailPage } from "./pages/CourseDetailPage";
 import { CourseListPage } from "./pages/CourseListPage";
-import { LoginPage } from "./pages/LoginPage";
-import { MyEnrollmentsPage } from "./pages/MyEnrollmentsPage";
-import { SessionRosterPage } from "./pages/SessionRosterPage";
 
 /**
  * 화면 경로(D-18, D-31): / 과정 목록, /courses/:id 과정 상세, /login 로그인,

@@ -1,16 +1,17 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { Route, Routes } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
-import { devAuthApi } from "../api/courseApi";
+import { authApi } from "../api/clients";
 import { renderWithProviders } from "../test-utils";
 import { LoginPage } from "./LoginPage";
 
-vi.mock("../api/courseApi", () => ({
-  devAuthApi: { login: vi.fn() },
+vi.mock("../api/clients", () => ({ authApi: { login: vi.fn() } }));
+vi.mock("../api/http", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/http")>()),
   setAuthHooks: vi.fn(),
 }));
 
-const login = vi.mocked(devAuthApi.login);
+const login = vi.mocked(authApi.login);
 
 function renderLogin(state?: unknown) {
   renderWithProviders(
@@ -45,7 +46,7 @@ beforeEach(() => {
       employeeId: "E1001",
       roles: ["EMPLOYEE"],
     },
-  } as Awaited<ReturnType<typeof devAuthApi.login>>);
+  } as Awaited<ReturnType<typeof authApi.login>>);
 });
 
 it("개발 환경 전용 로그인임을 표시한다", () => {

@@ -91,7 +91,9 @@
   - 시작할 때 읽는다. 만료됐으면 버린다.
   - 읽기와 쓰기는 try/catch로 감싸, 저장소를 쓸 수 없으면 메모리에만 둔다.
 
-### 4.2 API 클라이언트 (`src/api/courseApi.ts` 한 곳)
+### 4.2 API 클라이언트 (`src/api/http.ts`의 인스턴스 하나)
+
+> 구조 변경(2026-11-19) 후: Axios 인스턴스, 인터셉터, 토큰 보관은 `src/api/http.ts`에 있고, API 클래스 인스턴스는 `src/api/courseApi.ts`(과정)와 `src/api/clients.ts`(인증·신청)가 이 인스턴스로 만든다.
 
 - Axios 인스턴스 하나에 요청 인터셉터를 둔다. 토큰이 있으면 `Authorization`을 붙인다.
 - 응답 인터셉터는 401이면 `logout()`하고 현재 위치를 기억한 채 `/login`으로 보낸다. 단, 로그인 요청 자체의 오류는 제외한다.

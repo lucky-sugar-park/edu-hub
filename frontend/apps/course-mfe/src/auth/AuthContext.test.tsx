@@ -1,15 +1,16 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { devAuthApi } from "../api/courseApi";
+import { authApi } from "../api/clients";
 import { fakeAuth, renderWithProviders } from "../test-utils";
 import { useAuth } from "./AuthContext";
 
-vi.mock("../api/courseApi", () => ({
-  devAuthApi: { login: vi.fn() },
+vi.mock("../api/clients", () => ({ authApi: { login: vi.fn() } }));
+vi.mock("../api/http", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/http")>()),
   setAuthHooks: vi.fn(),
 }));
 
-const login = vi.mocked(devAuthApi.login);
+const login = vi.mocked(authApi.login);
 
 function Probe() {
   const auth = useAuth();
@@ -38,7 +39,7 @@ beforeEach(() => {
       employeeId: "E2002",
       roles: ["EMPLOYEE", "ADMIN"],
     },
-  } as Awaited<ReturnType<typeof devAuthApi.login>>);
+  } as Awaited<ReturnType<typeof authApi.login>>);
 });
 
 it("로그인하면 상태와 저장소에 담긴다", async () => {

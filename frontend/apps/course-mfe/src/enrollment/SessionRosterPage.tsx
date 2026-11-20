@@ -28,9 +28,10 @@ import { useEffect, useRef, useState } from "react";
 import { Link as RouterLink, useParams } from "react-router-dom";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { formatDateTime } from "../format";
-import { useCompletion } from "../hooks/useCompletion";
-import { SessionForbiddenError, SessionNotFoundError, useSessionRoster } from "../hooks/useSessionRoster";
-import { enrollmentStatusLabel, failureReasonLabel, statusLabel } from "../statusLabels";
+import { useCompletion } from "./useCompletion";
+import { SessionForbiddenError, SessionNotFoundError, useSessionRoster } from "./useSessionRoster";
+import { statusLabel } from "../statusLabels";
+import { enrollmentStatusLabel, failureReasonLabel } from "./labels";
 
 /** 한 번에 수료 처리할 수 있는 최대 인원. 백엔드 CompletionRequest의 @Size(max = 200)과 맞춘다. */
 const MAX_SELECTION = 200;
@@ -84,7 +85,8 @@ export function SessionRosterPage() {
   }, [data]);
 
   // 상한 때문에 전부 선택할 수 없는 회차에서는 "상한까지 선택됨"을 전체 선택으로 본다.
-  const allSelected = selectable.length > 0 && selected.size >= Math.min(selectable.length, MAX_SELECTION);
+  const allSelected =
+    selectable.length > 0 && selected.size >= Math.min(selectable.length, MAX_SELECTION);
   const limitReached = selected.size >= MAX_SELECTION;
   const someSelected = selected.size > 0 && !allSelected;
 
@@ -241,7 +243,8 @@ export function SessionRosterPage() {
                           <Checkbox
                             checked={selected.has(employeeId)}
                             disabled={
-                              entry.status !== "CONFIRMED" || (limitReached && !selected.has(employeeId))
+                              entry.status !== "CONFIRMED" ||
+                              (limitReached && !selected.has(employeeId))
                             }
                             onChange={() => toggle(employeeId)}
                             slotProps={{ input: { "aria-label": `${employeeId} 선택` } }}

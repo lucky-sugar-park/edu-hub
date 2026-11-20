@@ -10,8 +10,15 @@ import {
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { isAxiosError } from "@eduhub/api-client";
-import { devAuthApi, setAuthHooks } from "../api/courseApi";
-import { clearAuth, isExpired, loadAuth, type StoredAuth, saveAuth } from "./authStorage";
+import { authApi } from "../api/clients";
+import {
+  clearAuth,
+  isExpired,
+  loadAuth,
+  type StoredAuth,
+  saveAuth,
+  setAuthHooks,
+} from "../api/http";
 
 export interface AuthContextValue {
   token: string | null;
@@ -60,11 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (employeeId: string) => {
-    let data: Awaited<ReturnType<typeof devAuthApi.login>>["data"];
+    let data: Awaited<ReturnType<typeof authApi.login>>["data"];
     try {
-      data = (await devAuthApi.login({ employeeId })).data;
+      data = (await authApi.login({ employeeId })).data;
     } catch (cause) {
-      if (isAxiosError(cause) && cause.response?.status === 404) throw new DevLoginUnavailableError();
+      if (isAxiosError(cause) && cause.response?.status === 404)
+        throw new DevLoginUnavailableError();
       throw cause;
     }
     const next: StoredAuth = {

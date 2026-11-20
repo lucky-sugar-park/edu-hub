@@ -3,16 +3,17 @@ import { expect, it, vi } from "vitest";
 import { App } from "./App";
 import { fakeAuth, renderWithProviders } from "./test-utils";
 
-vi.mock("./api/courseApi", () => ({
-  devAuthApi: { login: vi.fn() },
+vi.mock("./api/clients", () => ({ authApi: { login: vi.fn() } }));
+vi.mock("./api/http", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./api/http")>()),
   setAuthHooks: vi.fn(),
 }));
 vi.mock("./pages/CourseListPage", () => ({ CourseListPage: () => <div>과정 목록 화면</div> }));
 vi.mock("./pages/CourseDetailPage", () => ({ CourseDetailPage: () => <div>과정 상세 화면</div> }));
-vi.mock("./pages/MyEnrollmentsPage", () => ({
+vi.mock("./enrollment/MyEnrollmentsPage", () => ({
   MyEnrollmentsPage: () => <h1>내 신청 내역</h1>,
 }));
-vi.mock("./pages/SessionRosterPage", () => ({
+vi.mock("./enrollment/SessionRosterPage", () => ({
   SessionRosterPage: () => <h1>회차 명단 화면</h1>,
 }));
 vi.mock("./pages/AdminCoursePage", () => ({ AdminCoursePage: () => <div>과정 관리 화면</div> }));

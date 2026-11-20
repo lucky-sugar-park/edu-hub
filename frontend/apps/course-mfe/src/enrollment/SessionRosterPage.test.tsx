@@ -1,16 +1,16 @@
 import type { SessionRosterResponse } from "@eduhub/api-client";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { type UseCompletionResult, useCompletion } from "../hooks/useCompletion";
-import { SessionForbiddenError, SessionNotFoundError, useSessionRoster } from "../hooks/useSessionRoster";
+import { type UseCompletionResult, useCompletion } from "./useCompletion";
+import { SessionForbiddenError, SessionNotFoundError, useSessionRoster } from "./useSessionRoster";
 import { fakeAuth, renderWithProviders } from "../test-utils";
 import { SessionRosterPage } from "./SessionRosterPage";
 
-vi.mock("../hooks/useSessionRoster", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../hooks/useSessionRoster")>()),
+vi.mock("./useSessionRoster", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./useSessionRoster")>()),
   useSessionRoster: vi.fn(),
 }));
-vi.mock("../hooks/useCompletion", () => ({ useCompletion: vi.fn() }));
+vi.mock("./useCompletion", () => ({ useCompletion: vi.fn() }));
 
 const mockedRoster = vi.mocked(useSessionRoster);
 const mockedCompletion = vi.mocked(useCompletion);
@@ -198,7 +198,9 @@ it("다시 불러온 명단에서 수료됐거나 사라진 사번은 선택에�
   given(makeRoster({ confirmed: [entry(2, "COMPLETED"), entry(4)] }));
   fireEvent.click(completeButton()); // 상태 변경으로 다시 그리게 하고 선택 수를 확인한다.
 
-  expect(within(screen.getByRole("dialog")).getByText(/선택한 1명을 수료 처리합니다/)).toBeInTheDocument();
+  expect(
+    within(screen.getByRole("dialog")).getByText(/선택한 1명을 수료 처리합니다/),
+  ).toBeInTheDocument();
 });
 
 it("회차가 없으면 찾을 수 없다고 알린다", () => {
@@ -327,7 +329,9 @@ it("수료 실패 뒤 다시 불러온 명단으로 선택이 비면 대화 상�
 
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   const notice = screen.getByRole("alert");
-  expect(notice).toHaveTextContent("선택한 사번이 더 이상 수료 처리 대상이 아닙니다. 명단을 확인해 주세요");
+  expect(notice).toHaveTextContent(
+    "선택한 사번이 더 이상 수료 처리 대상이 아닙니다. 명단을 확인해 주세요",
+  );
   expect(notice).toHaveTextContent("회차가 아직 열려 있습니다.");
 });
 
@@ -341,7 +345,9 @@ it("진행 중에는 확인 버튼이 꺼진다", () => {
   completion = { ...completion, submitting: true };
   fireEvent.click(screen.getByRole("checkbox", { name: "E1002 선택", hidden: true })); // 다시 그리게 한다.
 
-  expect(within(screen.getByRole("dialog")).getByRole("button", { name: "수료 처리" })).toBeDisabled();
+  expect(
+    within(screen.getByRole("dialog")).getByRole("button", { name: "수료 처리" }),
+  ).toBeDisabled();
 });
 
 it("열린 회차의 수료 버튼은 안내 문구와 aria-describedby로 연결된다", () => {

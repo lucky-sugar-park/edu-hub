@@ -1,6 +1,6 @@
 import { isAxiosError, type SessionRosterResponse } from "@eduhub/api-client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { enrollmentAdminApi } from "../api/courseApi";
+import { adminEnrollmentApi } from "../api/clients";
 
 /** 회차가 없을 때(404, 또는 숫자가 아닌 id) 돌려주는 에러다. 화면은 이것으로 일반 실패와 구분한다. */
 export class SessionNotFoundError extends Error {
@@ -56,7 +56,7 @@ export function useSessionRoster(sessionId: number): UseSessionRosterResult {
     // 회차가 바뀐 뒤 늦게 도착한 이전 응답은 무시한다.
     let ignore = false;
     setLoading(true);
-    enrollmentAdminApi
+    adminEnrollmentApi
       .getRoster(sessionId)
       .then((response) => {
         if (ignore) return;

@@ -1,10 +1,10 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { enrollmentApi } from "../api/courseApi";
+import { enrollmentApi } from "../api/clients";
 import { useAuth } from "../auth/AuthContext";
 import { useMyEnrollments } from "./useMyEnrollments";
 
-vi.mock("../api/courseApi", () => ({
+vi.mock("../api/clients", () => ({
   enrollmentApi: { getMyEnrollments: vi.fn() },
 }));
 vi.mock("../auth/AuthContext", () => ({ useAuth: vi.fn() }));
@@ -17,7 +17,12 @@ function loggedIn(token: string | null) {
   mockedUseAuth.mockReturnValue({ token } as ReturnType<typeof useAuth>);
 }
 
-const page = { content: [{ id: 1, sessionId: 10, status: "CONFIRMED" as const }], page: 0, size: 100, totalElements: 1 };
+const page = {
+  content: [{ id: 1, sessionId: 10, status: "CONFIRMED" as const }],
+  page: 0,
+  size: 100,
+  totalElements: 1,
+};
 
 beforeEach(() => {
   vi.resetAllMocks();

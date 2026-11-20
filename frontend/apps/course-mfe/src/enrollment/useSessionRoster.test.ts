@@ -1,13 +1,13 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { enrollmentAdminApi } from "../api/courseApi";
+import { adminEnrollmentApi } from "../api/clients";
 import { SessionForbiddenError, SessionNotFoundError, useSessionRoster } from "./useSessionRoster";
 
-vi.mock("../api/courseApi", () => ({
-  enrollmentAdminApi: { getRoster: vi.fn() },
+vi.mock("../api/clients", () => ({
+  adminEnrollmentApi: { getRoster: vi.fn() },
 }));
 
-const getRoster = vi.mocked(enrollmentAdminApi.getRoster);
+const getRoster = vi.mocked(adminEnrollmentApi.getRoster);
 type Response = Awaited<ReturnType<typeof getRoster>>;
 
 function roster(sessionId: number, title = `과정 ${sessionId}`) {

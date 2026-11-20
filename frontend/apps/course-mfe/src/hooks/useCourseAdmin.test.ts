@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { courseAdminApi } from "../api/courseApi";
-import { toErrorMessage, useCourseAdmin } from "./useCourseAdmin";
+import { useCourseAdmin } from "./useCourseAdmin";
 
 vi.mock("../api/courseApi", () => ({
   courseAdminApi: {
@@ -40,7 +40,10 @@ it("과정을 등록하고 응답 본문을 돌려준다", async () => {
 it("실패하면 null을 돌려주고 서버 메시지를 error에 담는다", async () => {
   api.updateSession.mockRejectedValue({
     response: {
-      data: { code: "SESSION_STARTED", message: "교육이 시작된 회차는 정원과 시작 시각을 바꿀 수 없습니다: 3" },
+      data: {
+        code: "SESSION_STARTED",
+        message: "교육이 시작된 회차는 정원과 시작 시각을 바꿀 수 없습니다: 3",
+      },
     },
   });
   const { result } = renderHook(() => useCourseAdmin());
@@ -81,9 +84,4 @@ it("각 함수가 알맞은 API를 부른다", async () => {
   expect(api.closeCourse).toHaveBeenCalledWith(1);
   expect(api.createSession).toHaveBeenCalledWith(1, session);
   expect(api.closeSession).toHaveBeenCalledWith(5);
-});
-
-it("응답이 없는 오류는 기본 문구를 쓴다", () => {
-  expect(toErrorMessage(new Error("Network Error"))).toBe("요청을 처리하지 못했습니다.");
-  expect(toErrorMessage(null)).toBe("요청을 처리하지 못했습니다.");
 });

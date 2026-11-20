@@ -1,7 +1,7 @@
 import type { EnrollmentResponse } from "@eduhub/api-client";
 import { useCallback, useMemo, useState } from "react";
-import { enrollmentApi } from "../api/courseApi";
-import { toErrorMessage } from "./useCourseAdmin";
+import { enrollmentApi } from "../api/clients";
+import { toErrorMessage } from "../api/errors";
 
 export interface UseEnrollmentActionsResult {
   submitting: boolean;
@@ -20,7 +20,9 @@ export function useEnrollmentActions(): UseEnrollmentActionsResult {
   const clearError = useCallback(() => setError(null), []);
 
   const run = useCallback(
-    async (call: () => Promise<{ data: EnrollmentResponse }>): Promise<EnrollmentResponse | null> => {
+    async (
+      call: () => Promise<{ data: EnrollmentResponse }>,
+    ): Promise<EnrollmentResponse | null> => {
       setSubmitting(true);
       setError(null);
       try {

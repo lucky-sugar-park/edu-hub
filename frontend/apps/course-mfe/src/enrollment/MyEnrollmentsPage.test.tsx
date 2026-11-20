@@ -2,16 +2,13 @@ import type { MyEnrollmentResponse } from "@eduhub/api-client";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { useLocation } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import {
-  type UseEnrollmentActionsResult,
-  useEnrollmentActions,
-} from "../hooks/useEnrollmentActions";
-import { useMyEnrollments } from "../hooks/useMyEnrollments";
+import { type UseEnrollmentActionsResult, useEnrollmentActions } from "./useEnrollmentActions";
+import { useMyEnrollments } from "./useMyEnrollments";
 import { fakeAuth, renderWithProviders } from "../test-utils";
 import { MyEnrollmentsPage } from "./MyEnrollmentsPage";
 
-vi.mock("../hooks/useMyEnrollments", () => ({ useMyEnrollments: vi.fn() }));
-vi.mock("../hooks/useEnrollmentActions", () => ({ useEnrollmentActions: vi.fn() }));
+vi.mock("./useMyEnrollments", () => ({ useMyEnrollments: vi.fn() }));
+vi.mock("./useEnrollmentActions", () => ({ useEnrollmentActions: vi.fn() }));
 
 const mockedUseMine = vi.mocked(useMyEnrollments);
 const mockedUseActions = vi.mocked(useEnrollmentActions);

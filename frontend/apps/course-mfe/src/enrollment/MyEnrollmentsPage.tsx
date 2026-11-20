@@ -28,9 +28,9 @@ import { useEffect, useState } from "react";
 import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { formatDateTime } from "../format";
-import { useEnrollmentActions } from "../hooks/useEnrollmentActions";
-import { useMyEnrollments } from "../hooks/useMyEnrollments";
-import { enrollmentStatusLabel } from "../statusLabels";
+import { useEnrollmentActions } from "./useEnrollmentActions";
+import { useMyEnrollments } from "./useMyEnrollments";
+import { enrollmentStatusLabel } from "./labels";
 
 const PAGE_SIZE = 20;
 const ALL = "ALL";
