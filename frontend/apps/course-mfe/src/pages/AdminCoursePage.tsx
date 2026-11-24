@@ -348,3 +348,6 @@ function Loading({ label }: { label: string }) {
     </Box>
   );
 }
+
+/** shell에는 courseMfe/CourseFormPage로 노출한다. */
+export default AdminCoursePage;

@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "dev": "vite",
     "test": "vitest run"
   },
   "dependencies": {
@@ -17,6 +18,7 @@
     "react-router-dom": "^7.18.5"
   },
   "devDependencies": {
+    "@module-federation/vite": "1.23.11",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",

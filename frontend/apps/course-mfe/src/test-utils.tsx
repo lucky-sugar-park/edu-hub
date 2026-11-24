@@ -1,7 +1,6 @@
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { AuthProvider } from "../../shell/src/auth/AuthContext";
 import { clearAuth, type StoredAuth, saveAuth } from "@eduhub/api-client";
 
 export interface RenderOptions {
@@ -18,22 +17,23 @@ export function fakeAuth(roles: string[] = ["EMPLOYEE"], employeeId = "E1001"): 
   return { token: "test-token", employeeId, roles, expiresAt: "2099-01-01T00:00:00Z" };
 }
 
-/** MemoryRouter와 AuthProvider로 감싸 그린다. */
+/**
+ * MemoryRouter로 감싸 그린다. 인증 상태(AuthProvider)는 shell 몫이라 여기서는 쓰지 않고,
+ * 로그인 상태가 필요하면 sessionStorage에만 넣는다(@eduhub/api-client의 saveAuth).
+ */
 export function renderWithProviders(ui: ReactElement, options: RenderOptions = {}) {
   const { route = "/", path, auth = null } = options;
   clearAuth();
   if (auth) saveAuth(auth);
   return render(
     <MemoryRouter initialEntries={[route]}>
-      <AuthProvider>
-        {path ? (
-          <Routes>
-            <Route path={path} element={ui} />
-          </Routes>
-        ) : (
-          ui
-        )}
-      </AuthProvider>
+      {path ? (
+        <Routes>
+          <Route path={path} element={ui} />
+        </Routes>
+      ) : (
+        ui
+      )}
     </MemoryRouter>,
   );
 }
