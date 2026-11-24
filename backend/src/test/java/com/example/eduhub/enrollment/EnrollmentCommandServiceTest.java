@@ -8,6 +8,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.example.eduhub.common.ConflictException;
@@ -28,6 +29,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -42,6 +44,7 @@ class EnrollmentCommandServiceTest {
   @Mock private CourseSessionRepository courseSessionRepository;
   @Mock private EnrollmentRepository enrollmentRepository;
   @Mock private VacancyFiller vacancyFiller;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   private EnrollmentCommandService service;
 
@@ -53,6 +56,7 @@ class EnrollmentCommandServiceTest {
             enrollmentRepository,
             new WaitingNumbers(enrollmentRepository),
             vacancyFiller,
+            eventPublisher,
             Clock.fixed(NOW, ZoneOffset.UTC));
   }
 
@@ -69,7 +73,11 @@ class EnrollmentCommandServiceTest {
 
   private void givenSaveReturnsArgument() {
     given(enrollmentRepository.saveAndFlush(any(Enrollment.class)))
-        .willAnswer(call -> call.getArgument(0));
+        .willAnswer(call -> {
+          Enrollment enrollment = call.getArgument(0);
+          ReflectionTestUtils.setField(enrollment, "id", 77L);
+          return enrollment;
+        });
   }
 
   private void givenConfirmedCount(long count) {
@@ -431,6 +439,64 @@ class EnrollmentCommandServiceTest {
     verify(courseSessionRepository).findByIdForUpdate(SESSION_ID);
     verify(courseSessionRepository, never()).findById(any());
     verifyNoMoreInteractions(courseSessionRepository);
+  }
+
+  @Test
+  void n8ConfirmedSavePublishesAppliedEvent() {
+    givenOpenSession(10);
+    givenConfirmedCount(0);
+    givenSaveReturnsArgument();
+
+    service.enroll(SESSION_ID, EMPLOYEE_ID);
+
+    ArgumentCaptor<EnrollmentConfirmedEvent> event =
+        ArgumentCaptor.forClass(EnrollmentConfirmedEvent.class);
+    verify(eventPublisher).publishEvent(event.capture());
+    assertThat(event.getValue())
+        .isEqualTo(
+            new EnrollmentConfirmedEvent(
+                77L, EMPLOYEE_ID, SESSION_ID, EnrollmentConfirmedEvent.Reason.APPLIED));
+  }
+
+  @Test
+  void n8WaitingSaveDoesNotPublish() {
+    givenOpenSession(1);
+    givenCounts(1, 0);
+    given(enrollmentRepository.findMaxWaitingKey(SESSION_ID)).willReturn(Optional.empty());
+    givenSaveReturnsArgument();
+
+    service.enroll(SESSION_ID, EMPLOYEE_ID);
+
+    verifyNoInteractions(eventPublisher);
+  }
+
+  @Test
+  void n8DuplicateDoesNotPublish() {
+    givenOpenSession(10);
+    given(enrollmentRepository.existsBySessionIdAndEmployeeIdAndStatusIn(anyLong(), any(), any()))
+        .willReturn(true);
+
+    assertThatThrownBy(() -> service.enroll(SESSION_ID, EMPLOYEE_ID))
+        .isInstanceOf(DuplicateEnrollmentException.class);
+
+    verifyNoInteractions(eventPublisher);
+  }
+
+  @Test
+  void n8UniqueViolationDoesNotPublish() {
+    givenOpenSession(10);
+    givenConfirmedCount(0);
+    given(enrollmentRepository.saveAndFlush(any(Enrollment.class)))
+        .willThrow(
+            new DataIntegrityViolationException(
+                "could not execute statement",
+                new SQLIntegrityConstraintViolationException(
+                    "Duplicate entry '3-E1001' for key 'UK_ENROLLMENT_ACTIVE'")));
+
+    assertThatThrownBy(() -> service.enroll(SESSION_ID, EMPLOYEE_ID))
+        .isInstanceOf(DuplicateEnrollmentException.class);
+
+    verifyNoInteractions(eventPublisher);
   }
 
   @Test

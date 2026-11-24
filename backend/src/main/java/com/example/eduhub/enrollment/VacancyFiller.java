@@ -3,6 +3,7 @@ package com.example.eduhub.enrollment;
 import com.example.eduhub.course.CourseSession;
 import java.time.Instant;
 import java.util.List;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -14,15 +15,20 @@ import org.springframework.transaction.annotation.Transactional;
 class VacancyFiller {
 
   private final EnrollmentRepository enrollmentRepository;
+  private final ApplicationEventPublisher eventPublisher;
 
-  VacancyFiller(EnrollmentRepository enrollmentRepository) {
+  VacancyFiller(
+      EnrollmentRepository enrollmentRepository, ApplicationEventPublisher eventPublisher) {
     this.enrollmentRepository = enrollmentRepository;
+    this.eventPublisher = eventPublisher;
   }
 
   /**
    * 빈자리(정원 - 확정 수)만큼 대기자를 키 오름차순으로 확정 승급시킨다. 교육이 시작했으면 아무것도 하지 않는다(D-09).
    *
    * <p>트랜잭션이 필수이다(MANDATORY). 트랜잭션 밖에서 부르면 예외가 난다. 회차 락을 잡는 것은 호출자의 책임이며, 락을 잡은 트랜잭션 안에서 호출해야 한다.
+   *
+   * <p>승급자마다 {@code PROMOTED} 이벤트를 발행하며, 리스너는 커밋 직전에 같은 트랜잭션에서 실행된다(D-32).
    *
    * @return 승급시킨 수
    */
@@ -45,6 +51,7 @@ class VacancyFiller {
     }
     promoted.forEach(enrollment -> enrollment.promote(now));
     enrollmentRepository.saveAllAndFlush(promoted);
+    promoted.forEach(e -> eventPublisher.publishEvent(EnrollmentConfirmedEvent.promoted(e)));
     return promoted.size();
   }
 }

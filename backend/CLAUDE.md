@@ -23,7 +23,7 @@
 - 상태 규칙(종료 여부, 시작 여부)은 엔티티 메서드에서 검사한다. 현재 시각은 `Clock` 빈(`common/ClockConfig`)으로 받아 테스트에서 고정한다.
 - 프런트 빌드 결과는 `src/main/resources/static`에 두고 백엔드가 함께 제공한다. 화면 경로(`/admin`, `/courses/{id}`, `/login`, `/me/enrollments`, `/admin/sessions/{sessionId}/roster`)는 `common/SpaForwardController`가 `index.html`로 넘긴다. 프런트에 화면 경로를 추가하면 여기에도 추가한다.
 - `course`는 `enrollment`를 참조하지 않는다. 자리를 차지한 신청 수(확정·수료, D-28)는 `course/SessionSeatCounter`로 받는다(D-22). 정원 변경에 따른 강등도 같은 방식으로 `course/SessionCapacityChangeHandler`를 `enrollment`가 구현해 받는다(D-24).
-- 패키지는 `com.example.eduhub` 아래 도메인별로 나눈다. `course`는 과정과 회차, `enrollment`는 신청·대기·취소·승급·수료, `common`은 공통 코드를 담는다(NFR-07).
+- 패키지는 `com.example.eduhub` 아래 도메인별로 나눈다. `course`는 과정과 회차, `enrollment`는 신청·대기·취소·승급·수료, `notification`은 알림 기록, `common`은 공통 코드를 담는다(NFR-07). `notification`은 `enrollment`의 이벤트(`EnrollmentConfirmedEvent`)만 구독하고, `enrollment`는 `notification`을 참조하지 않는다.
 
 ## JPA 규칙
 
@@ -66,6 +66,7 @@
 - 목록 조회에서 대기 순번이 필요하면 행마다 `WaitingNumbers.numberOf()`를 부르지 말고, `EnrollmentRepository.findMyEnrollments`처럼 같은 쿼리 안의 서브쿼리로 계산한다(N+1 방지).
 - 신청 취소는 행을 지우지 않고 `CANCELLED`와 `cancelled_at`을 남기며, 교육 시작 후에는 확정·대기 모두 취소할 수 없다(409 `SESSION_STARTED`, D-25).
 - 빈자리 채우기(D-26)는 교육 시작 전에만 하고, 대기 키 오름차순으로 빈자리만큼 승급한다. 확정자 취소와 정원 증가(D-02)가 같은 규칙(`enrollment/VacancyFiller`)을 쓰고, 대기자 취소는 승급이 없다. `VacancyFiller`는 `Propagation.MANDATORY`라 트랜잭션 밖에서 부르면 예외가 나며, 회차 행 락은 호출자가 먼저 잡아야 한다.
+- 알림(FR-09, D-32): 확정 시 `EnrollmentConfirmedEvent`를 발행하는 곳은 `EnrollmentCommandService.enroll`(APPLIED)과 `VacancyFiller`(PROMOTED) 두 군데다. `notification/NotificationListener`는 `BEFORE_COMMIT`으로 같은 트랜잭션에서 저장하므로 저장이 실패하면 신청도 롤백된다. 커밋 뒤에 DB를 쓰는 리스너(`AFTER_COMMIT` + `REQUIRES_NEW`)는 바깥 커넥션이 반환되기 전에 커넥션을 하나 더 요구해 풀 교착을 일으키므로 쓰지 않는다. 승급 경로를 새로 만들면 `VacancyFiller`를 거쳐야 알림이 빠지지 않는다. 새로 쓰는 커밋형 통합 테스트는 자기가 남긴 알림 행을 사번 접두어로 지운다(`NotificationIntegrationTest`의 `N9-`처럼). FR-09 이전부터 있던 커밋형 테스트(`EnrollmentConcurrencyTest`, `VacancySelfHealIntegrationTest`, `CompletionConcurrencyTest`, `SessionLockIntegrationTest`, `SecurityIntegrationTest`)는 아직 알림 행을 지우지 않아 `eduhub_test`에 쌓인다(남은 과제). 그래서 알림 전체 행 수에 기대는 테스트를 쓰지 않는다. INFO 로그 "알림 기록(커밋 전)"은 커밋 직전에 남으므로, 그 뒤 커밋이 실패하면 DB에는 알림이 없을 수 있다.
 
 ## 빌드 환경 주의
 

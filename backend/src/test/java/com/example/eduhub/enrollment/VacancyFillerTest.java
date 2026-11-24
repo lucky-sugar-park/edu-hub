@@ -6,7 +6,9 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.example.eduhub.course.Course;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -30,12 +33,13 @@ class VacancyFillerTest {
   private static final Long SESSION_ID = 3L;
 
   @Mock private EnrollmentRepository enrollmentRepository;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   private VacancyFiller filler;
 
   @BeforeEach
   void setUp() {
-    filler = new VacancyFiller(enrollmentRepository);
+    filler = new VacancyFiller(enrollmentRepository, eventPublisher);
   }
 
   private CourseSession session(Instant startAt, int capacity) {
@@ -78,6 +82,17 @@ class VacancyFillerTest {
     assertThat(page.getValue().getPageNumber()).isZero();
     assertThat(page.getValue().getPageSize()).isEqualTo(2);
     verify(enrollmentRepository).saveAllAndFlush(firstTwo);
+    ArgumentCaptor<EnrollmentConfirmedEvent> events =
+        ArgumentCaptor.forClass(EnrollmentConfirmedEvent.class);
+    verify(eventPublisher, times(2)).publishEvent(events.capture());
+    assertThat(events.getAllValues())
+        .extracting(EnrollmentConfirmedEvent::employeeId)
+        .containsExactly("E1", "E2");
+    assertThat(events.getAllValues())
+        .allSatisfy(event -> {
+          assertThat(event.reason()).isEqualTo(EnrollmentConfirmedEvent.Reason.PROMOTED);
+          assertThat(event.sessionId()).isEqualTo(SESSION_ID);
+        });
     assertThat(firstTwo)
         .allSatisfy(e -> {
           assertThat(e.getStatus()).isEqualTo(EnrollmentStatus.CONFIRMED);
@@ -105,6 +120,7 @@ class VacancyFillerTest {
 
     assertThat(filler.fillVacancies(session, NOW)).isZero();
     verify(enrollmentRepository, never()).saveAllAndFlush(any());
+    verifyNoInteractions(eventPublisher);
   }
 
   @Test
@@ -117,6 +133,7 @@ class VacancyFillerTest {
     verify(enrollmentRepository, never())
         .findBySessionIdAndStatusOrderByWaitingKeyAsc(anyLong(), any(), any());
     verify(enrollmentRepository, never()).saveAllAndFlush(any());
+    verifyNoInteractions(eventPublisher);
   }
 
   @Test
@@ -146,6 +163,7 @@ class VacancyFillerTest {
     verify(enrollmentRepository, never())
         .findBySessionIdAndStatusOrderByWaitingKeyAsc(anyLong(), any(), any());
     verify(enrollmentRepository, never()).saveAllAndFlush(any());
+    verifyNoInteractions(eventPublisher);
   }
 
   @Test
@@ -155,5 +173,6 @@ class VacancyFillerTest {
     assertThat(filler.fillVacancies(session, NOW)).isZero();
 
     verifyNoMoreInteractions(enrollmentRepository);
+    verifyNoInteractions(eventPublisher);
   }
 }

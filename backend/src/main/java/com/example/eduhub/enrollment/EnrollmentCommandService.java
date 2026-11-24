@@ -6,6 +6,7 @@ import com.example.eduhub.course.SessionNotFoundException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Locale;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -21,6 +22,7 @@ public class EnrollmentCommandService {
   private final EnrollmentRepository enrollmentRepository;
   private final WaitingNumbers waitingNumbers;
   private final VacancyFiller vacancyFiller;
+  private final ApplicationEventPublisher eventPublisher;
   private final Clock clock;
 
   public EnrollmentCommandService(
@@ -28,7 +30,9 @@ public class EnrollmentCommandService {
       EnrollmentRepository enrollmentRepository,
       WaitingNumbers waitingNumbers,
       VacancyFiller vacancyFiller,
+      ApplicationEventPublisher eventPublisher,
       Clock clock) {
+    this.eventPublisher = eventPublisher;
     this.courseSessionRepository = courseSessionRepository;
     this.enrollmentRepository = enrollmentRepository;
     this.waitingNumbers = waitingNumbers;
@@ -72,6 +76,9 @@ public class EnrollmentCommandService {
       enrollment = Enrollment.waiting(session, employeeId, now, waitingKey);
     }
     Enrollment saved = save(enrollment, sessionId);
+    if (saved.getStatus() == EnrollmentStatus.CONFIRMED) {
+      eventPublisher.publishEvent(EnrollmentConfirmedEvent.applied(saved));
+    }
     return EnrollmentResponse.of(saved, waitingNumbers.numberOf(saved));
   }
 
@@ -97,7 +104,6 @@ public class EnrollmentCommandService {
     // 취소한 사람이 대기자여도 항상 부른다. 정상 데이터에서는 승급이 없지만(D-01),
     // "확정 < 정원이고 대기자가 있는" 오래된 상태를 자기 복구하기 위해서다(D-26).
     vacancyFiller.fillVacancies(session, now);
-    // TODO(FR-09): 승급 알림
     return EnrollmentResponse.of(enrollment, null);
   }
 
