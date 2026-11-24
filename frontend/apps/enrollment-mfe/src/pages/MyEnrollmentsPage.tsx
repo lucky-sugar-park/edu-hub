@@ -26,8 +26,8 @@ import {
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import { Link as RouterLink, useSearchParams } from "react-router-dom";
-import { ConfirmDialog } from "../../../course-mfe/src/components/ConfirmDialog";
-import { formatDateTime } from "../../../course-mfe/src/format";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { formatDateTime } from "../format";
 import { useEnrollmentActions } from "../hooks/useEnrollmentActions";
 import { useMyEnrollments } from "../hooks/useMyEnrollments";
 import { enrollmentStatusLabel } from "./labels";
@@ -59,7 +59,7 @@ function hasStarted(enrollment: MyEnrollmentResponse, now: number): boolean {
  * 내 신청 내역(FR-07). 탭(status)과 페이지는 URL 쿼리(?status=WAITING&page=1)에 둔다.
  * 새로고침과 뒤로가기에서 상태가 유지되고, 주소를 그대로 공유할 수 있다.
  */
-export function MyEnrollmentsPage() {
+export default function MyEnrollmentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const status = parseStatus(searchParams.get("status"));
   const page = parsePage(searchParams.get("page"));

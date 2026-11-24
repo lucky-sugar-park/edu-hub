@@ -1,10 +1,10 @@
-import type {
-  GetMyEnrollmentsStatusEnum,
-  PageResponseMyEnrollmentResponse,
+import {
+  enrollmentApi,
+  type GetMyEnrollmentsStatusEnum,
+  loadAuth,
+  type PageResponseMyEnrollmentResponse,
 } from "@eduhub/api-client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { enrollmentApi } from "../api/clients";
-import { useAuth } from "../../../shell/src/auth/AuthContext";
 
 export interface UseMyEnrollmentsResult {
   data: PageResponseMyEnrollmentResponse | null;
@@ -20,7 +20,8 @@ export function useMyEnrollments(
   page = 0,
   size = 20,
 ): UseMyEnrollmentsResult {
-  const { token } = useAuth();
+  // shell의 AuthProvider는 remote와 공유하지 않는다. 로그인 상태는 공유 저장소(sessionStorage)에서 읽는다.
+  const token = loadAuth()?.token ?? null;
   const loggedIn = token !== null;
   const [data, setData] = useState<PageResponseMyEnrollmentResponse | null>(null);
   const [loading, setLoading] = useState(loggedIn);

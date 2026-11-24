@@ -7,8 +7,8 @@ import {
   useEnrollmentActions,
 } from "../hooks/useEnrollmentActions";
 import { useMyEnrollments } from "../hooks/useMyEnrollments";
-import { fakeAuth, renderWithProviders } from "../../../course-mfe/src/test-utils";
-import { MyEnrollmentsPage } from "./MyEnrollmentsPage";
+import { fakeAuth, renderWithProviders } from "../test-utils";
+import MyEnrollmentsPage from "./MyEnrollmentsPage";
 
 vi.mock("../hooks/useMyEnrollments", () => ({ useMyEnrollments: vi.fn() }));
 vi.mock("../hooks/useEnrollmentActions", () => ({ useEnrollmentActions: vi.fn() }));

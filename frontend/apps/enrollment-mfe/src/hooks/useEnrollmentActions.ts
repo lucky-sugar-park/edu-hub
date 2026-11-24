@@ -1,7 +1,5 @@
-import type { EnrollmentResponse } from "@eduhub/api-client";
+import { type EnrollmentResponse, enrollmentApi, toErrorMessage } from "@eduhub/api-client";
 import { useCallback, useMemo, useState } from "react";
-import { enrollmentApi } from "../api/clients";
-import { toErrorMessage } from "../../../course-mfe/src/api/errors";
 
 export interface UseEnrollmentActionsResult {
   submitting: boolean;

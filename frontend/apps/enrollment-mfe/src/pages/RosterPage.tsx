@@ -26,22 +26,22 @@ import {
 } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import { Link as RouterLink, useParams } from "react-router-dom";
-import { ConfirmDialog } from "../../../course-mfe/src/components/ConfirmDialog";
-import { formatDateTime } from "../../../course-mfe/src/format";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { formatDateTime } from "../format";
 import { useCompletion } from "../hooks/useCompletion";
 import {
   SessionForbiddenError,
   SessionNotFoundError,
   useSessionRoster,
 } from "../hooks/useSessionRoster";
-import { statusLabel } from "../../../course-mfe/src/statusLabels";
+import { statusLabel } from "../statusLabels";
 import { enrollmentStatusLabel, failureReasonLabel } from "./labels";
 
 /** 한 번에 수료 처리할 수 있는 최대 인원. 백엔드 CompletionRequest의 @Size(max = 200)과 맞춘다. */
 const MAX_SELECTION = 200;
 
 /** 관리자의 회차 명단과 수료 처리(FR-08, D-28). */
-export function SessionRosterPage() {
+export default function RosterPage() {
   const { sessionId } = useParams();
   // 숫자가 아니면 NaN이 되고, 훅이 요청 없이 "회차 없음"으로 처리한다.
   const id = Number(sessionId);

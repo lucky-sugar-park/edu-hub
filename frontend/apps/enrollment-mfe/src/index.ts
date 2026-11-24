@@ -1,9 +1,0 @@
-// enrollment 영역의 공개 경계. 다른 영역(과정 화면, App)은 여기서만 가져다 쓴다.
-export { MyEnrollmentsPage } from "./pages/MyEnrollmentsPage";
-export {
-  SessionEnrollmentCells,
-  SessionEnrollmentHeadCells,
-  SessionEnrollmentNotices,
-} from "./components/SessionEnrollmentColumns";
-export { SessionRosterPage } from "./pages/SessionRosterPage";
-export { useSessionEnrollments } from "./hooks/useSessionEnrollments";

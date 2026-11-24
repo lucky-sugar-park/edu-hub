@@ -1,20 +1,20 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { enrollmentApi } from "../api/clients";
-import { useAuth } from "../../../shell/src/auth/AuthContext";
+import { enrollmentApi } from "@eduhub/api-client";
+import { fakeAuth, setLoggedIn } from "../test-utils";
 import { useMyEnrollments } from "./useMyEnrollments";
 
-vi.mock("../api/clients", () => ({
+vi.mock("@eduhub/api-client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@eduhub/api-client")>()),
   enrollmentApi: { getMyEnrollments: vi.fn() },
 }));
-vi.mock("../../../shell/src/auth/AuthContext", () => ({ useAuth: vi.fn() }));
 
 const api = vi.mocked(enrollmentApi);
-const mockedUseAuth = vi.mocked(useAuth);
 type Response<T extends (...args: never[]) => unknown> = Awaited<ReturnType<T>>;
 
+/** 로그인 상태는 shell과 공유하는 저장소(sessionStorage)로 만든다. null이면 로그아웃. */
 function loggedIn(token: string | null) {
-  mockedUseAuth.mockReturnValue({ token } as ReturnType<typeof useAuth>);
+  setLoggedIn(token === null ? null : { ...fakeAuth(), token });
 }
 
 const page = {

@@ -7,8 +7,8 @@ import {
   SessionNotFoundError,
   useSessionRoster,
 } from "../hooks/useSessionRoster";
-import { fakeAuth, renderWithProviders } from "../../../course-mfe/src/test-utils";
-import { SessionRosterPage } from "./SessionRosterPage";
+import { fakeAuth, renderWithProviders } from "../test-utils";
+import RosterPage from "./RosterPage";
 
 vi.mock("../hooks/useSessionRoster", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../hooks/useSessionRoster")>()),
@@ -67,7 +67,7 @@ function given(
 }
 
 function renderPage(sessionId = "10") {
-  renderWithProviders(<SessionRosterPage />, {
+  renderWithProviders(<RosterPage />, {
     route: `/admin/sessions/${sessionId}/roster`,
     path: "/admin/sessions/:sessionId/roster",
     auth: fakeAuth(["EMPLOYEE", "ADMIN"], "E9001"),

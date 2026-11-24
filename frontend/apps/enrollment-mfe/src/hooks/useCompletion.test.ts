@@ -1,9 +1,10 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { adminEnrollmentApi } from "../api/clients";
+import { adminEnrollmentApi } from "@eduhub/api-client";
 import { useCompletion } from "./useCompletion";
 
-vi.mock("../api/clients", () => ({
+vi.mock("@eduhub/api-client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@eduhub/api-client")>()),
   adminEnrollmentApi: { complete: vi.fn() },
 }));
 

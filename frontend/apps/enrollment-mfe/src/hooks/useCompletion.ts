@@ -1,7 +1,5 @@
-import type { CompletionResponse } from "@eduhub/api-client";
+import { adminEnrollmentApi, type CompletionResponse, toErrorMessage } from "@eduhub/api-client";
 import { useCallback, useMemo, useState } from "react";
-import { adminEnrollmentApi } from "../api/clients";
-import { toErrorMessage } from "../../../course-mfe/src/api/errors";
 
 export interface UseCompletionResult {
   submitting: boolean;
