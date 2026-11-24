@@ -1,8 +1,8 @@
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { AuthProvider } from "./auth/AuthContext";
-import { clearAuth, type StoredAuth, saveAuth } from "./api/http";
+import { AuthProvider } from "../../shell/src/auth/AuthContext";
+import { clearAuth, type StoredAuth, saveAuth } from "@eduhub/api-client";
 
 export interface RenderOptions {
   /** 시작 경로(기본 "/"). 돌아올 경로 같은 state가 필요하면 객체로 준다. */

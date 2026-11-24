@@ -21,7 +21,7 @@ import {
   SessionEnrollmentHeadCells,
   SessionEnrollmentNotices,
   useSessionEnrollments,
-} from "../enrollment";
+} from "../../../enrollment-mfe/src";
 import { formatDateTime } from "../format";
 import { CourseNotFoundError, useCourse } from "../hooks/useCourse";
 import { statusLabel } from "../statusLabels";

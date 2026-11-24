@@ -6,8 +6,8 @@ import { CourseNotFoundError, useCourse } from "../hooks/useCourse";
 import {
   type UseEnrollmentActionsResult,
   useEnrollmentActions,
-} from "../enrollment/useEnrollmentActions";
-import { useMyEnrollments } from "../enrollment/useMyEnrollments";
+} from "../../../enrollment-mfe/src/hooks/useEnrollmentActions";
+import { useMyEnrollments } from "../../../enrollment-mfe/src/hooks/useMyEnrollments";
 import { fakeAuth, renderWithProviders } from "../test-utils";
 import { CourseDetailPage } from "./CourseDetailPage";
 
@@ -15,8 +15,12 @@ vi.mock("../hooks/useCourse", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../hooks/useCourse")>()),
   useCourse: vi.fn(),
 }));
-vi.mock("../enrollment/useMyEnrollments", () => ({ useMyEnrollments: vi.fn() }));
-vi.mock("../enrollment/useEnrollmentActions", () => ({ useEnrollmentActions: vi.fn() }));
+vi.mock("../../../enrollment-mfe/src/hooks/useMyEnrollments", () => ({
+  useMyEnrollments: vi.fn(),
+}));
+vi.mock("../../../enrollment-mfe/src/hooks/useEnrollmentActions", () => ({
+  useEnrollmentActions: vi.fn(),
+}));
 
 const mockedUseCourse = vi.mocked(useCourse);
 const mockedUseMyEnrollments = vi.mocked(useMyEnrollments);

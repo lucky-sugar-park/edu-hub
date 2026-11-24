@@ -1,5 +1,5 @@
 import { CourseAdminApi, CourseApi } from "@eduhub/api-client";
-import { apiConfiguration, httpClient } from "./http";
+import { apiConfiguration, httpClient } from "@eduhub/api-client";
 
 export const courseApi = new CourseApi(apiConfiguration, undefined, httpClient);
 
