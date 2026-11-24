@@ -6,11 +6,11 @@ import { defineConfig } from "vitest/config";
 /** 모든 MFE가 한 벌만 쓰는 패키지. 인증 상태(httpClient, 토큰 훅)도 하나여야 하므로 api-client도 넣는다. */
 const SINGLETONS = [
   "react",
-  "react-dom",
+  "react-dom", // 라우터 상태를 shell과 remote가 함께 쓴다
   "react-router-dom",
   "@mui/material",
   "@emotion/react",
-  "@eduhub/api-client",
+  "@eduhub/api-client", // 토큰 처리(http 인터셉터)를 한 벌만
 ];
 
 const REMOTE_MODULE = /^(courseMfe|enrollmentMfe)\//;
@@ -38,6 +38,10 @@ export default defineConfig(({ mode }) => {
   const { API_PROXY_TARGET } = loadEnv(mode, ".", "API_");
   const proxy = { "/api": API_PROXY_TARGET || "http://localhost:8085" };
 
+  const deploy = mode === "deploy"; // npm run build:deploy (한 주소로 배포할 때)
+  const entry = (port: number, path: string) =>
+    deploy ? `/mfe/${path}/remoteEntry.js` : `http://localhost:${port}/remoteEntry.js`;
+
   return {
     plugins: [
       react(),
@@ -47,16 +51,14 @@ export default defineConfig(({ mode }) => {
         : federation({
             name: "shell",
             remotes: {
-              courseMfe: {
-                type: "module",
-                name: "courseMfe",
-                entry: "http://localhost:3001/remoteEntry.js",
-              },
+              courseMfe: { type: "module", name: "courseMfe", entry: entry(3001, "course") },
+              // courseMfe: { type: "module", name: "courseMfe", entry: "http://localhost:3001/remoteEntry.js", },
               enrollmentMfe: {
                 type: "module",
                 name: "enrollmentMfe",
-                entry: "http://localhost:3002/remoteEntry.js",
+                entry: entry(3002, "enrollment"),
               },
+              // enrollmentMfe: { type: "module", name: "enrollmentMfe", entry: "http://localhost:3002/remoteEntry.js", },
             },
             shared: Object.fromEntries(SINGLETONS.map((name) => [name, { singleton: true }])),
             // remote 타입은 src/remotes.d.ts에 직접 적는다.
@@ -68,7 +70,7 @@ export default defineConfig(({ mode }) => {
     build: { target: "esnext" },
     test: {
       environment: "jsdom",
-      setupFiles: "./src/test-setup.ts",
+      setupFiles: ["./src/test-setup.ts"],
     },
   };
 });

@@ -19,6 +19,8 @@ export default defineConfig(({ mode }) => {
   const proxy = { "/api": API_PROXY_TARGET || "http://localhost:8085" };
 
   return {
+    // 한 주소로 배포할 때(npm run build:deploy) 파일은 /mfe/enrollment/ 아래에 놓인다(scripts/deploy-frontend.ps1).
+    base: mode === "deploy" ? "/mfe/enrollment/" : "/",
     plugins: [
       react(),
       // 테스트는 노출 모듈을 직접 불러오므로 federation이 필요 없다.

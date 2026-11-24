@@ -42,6 +42,9 @@ tasks.bootRun {
     args("--spring.profiles.active=dev")
 }
 
+// 실수로 화면 파일이 jar에 들어가지 않게 (선택)
+tasks.processResources { exclude("static/**", "public/**") }
+
 spotless {
     java {
         googleJavaFormat()

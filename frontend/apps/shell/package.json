@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:deploy": "tsc --noEmit && vite build --mode deploy"
   },
   "dependencies": {
     "@eduhub/api-client": "^0.0.0",

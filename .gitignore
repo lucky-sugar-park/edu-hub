@@ -45,3 +45,5 @@ desktop.ini
 # 플러그인·도구가 만드는 숨김 폴더(예: .claude/.superpowers/)
 .claude/.*/
 /.metadata/
+
+run/
