@@ -1,7 +1,2 @@
-import { CourseAdminApi, CourseApi } from "@eduhub/api-client";
-import { apiConfiguration, httpClient } from "./http";
-
-export const courseApi = new CourseApi(apiConfiguration, undefined, httpClient);
-
-/** 관리자 전용 API(FR-03). */
-export const courseAdminApi = new CourseAdminApi(apiConfiguration, undefined, httpClient);
+// API 인스턴스는 @eduhub/api-client가 하나만 만든다(shared singleton). 기존 import 경로를 지키려고 다시 내보내기만 한다.
+export { courseAdminApi, courseApi } from "@eduhub/api-client";

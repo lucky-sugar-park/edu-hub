@@ -15,23 +15,37 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
+import type { CourseDetailResponse, SessionResponse } from "@eduhub/api-client";
+import type { ReactNode } from "react";
 import { Link as RouterLink, useParams } from "react-router-dom";
-import {
-  SessionEnrollmentCells,
-  SessionEnrollmentHeadCells,
-  SessionEnrollmentNotices,
-  useSessionEnrollments,
-} from "../enrollment";
 import { formatDateTime } from "../format";
 import { CourseNotFoundError, useCourse } from "../hooks/useCourse";
 import { statusLabel } from "../statusLabels";
 
-export function CourseDetailPage() {
-  const { id } = useParams();
+/** 회차 행의 작업 칸을 그릴 때 받는 값. reload로 남은 자리 등을 다시 불러온다. */
+export interface SessionActionContext {
+  course: CourseDetailResponse;
+  session: SessionResponse;
+  reload: () => void;
+}
+
+export interface CourseDetailPageProps {
+  /**
+   * 회차 행마다 부른다. shell이 enrollmentMfe의 EnrollButton을 끼워 넣는다.
+   * 주지 않으면(단독 실행) 작업 열을 그리지 않는다.
+   */
+  renderSessionAction?: (context: SessionActionContext) => ReactNode;
+}
+
+/** 표의 기본 열(일정·장소·정원·남은 자리·상태) 수. */
+const BASE_COLUMNS = 5;
+
+export function CourseDetailPage({ renderSessionAction }: CourseDetailPageProps = {}) {
+  const { courseId } = useParams();
   // 숫자가 아니면 NaN이 되고, 훅이 요청 없이 "과정 없음"으로 처리한다.
-  const { data: course, loading, error, reload: reloadCourse } = useCourse(Number(id));
+  const { data: course, loading, error, reload } = useCourse(Number(courseId));
   const sessions = course?.sessions ?? [];
-  const enrollments = useSessionEnrollments(course, reloadCourse);
+  const columns = BASE_COLUMNS + (renderSessionAction ? 1 : 0);
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -54,8 +68,6 @@ export function CourseDetailPage() {
       {!loading && error && !(error instanceof CourseNotFoundError) && (
         <Alert severity="error">과정 정보를 불러오지 못했습니다.</Alert>
       )}
-
-      <SessionEnrollmentNotices enrollments={enrollments} />
 
       {!loading && course && (
         <>
@@ -85,7 +97,7 @@ export function CourseDetailPage() {
                     <TableCell align="right">정원</TableCell>
                     <TableCell align="right">남은 자리</TableCell>
                     <TableCell>상태</TableCell>
-                    <SessionEnrollmentHeadCells />
+                    {renderSessionAction && <TableCell>신청</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -96,16 +108,14 @@ export function CourseDetailPage() {
                       <TableCell align="right">{session.capacity}</TableCell>
                       <TableCell align="right">{session.remainingSeats}</TableCell>
                       <TableCell>{statusLabel(session.status)}</TableCell>
-                      <SessionEnrollmentCells
-                        enrollments={enrollments}
-                        course={course}
-                        session={session}
-                      />
+                      {renderSessionAction && (
+                        <TableCell>{renderSessionAction({ course, session, reload })}</TableCell>
+                      )}
                     </TableRow>
                   ))}
                   {sessions.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} align="center">
+                      <TableCell colSpan={columns} align="center">
                         등록된 회차가 없습니다.
                       </TableCell>
                     </TableRow>
@@ -119,3 +129,5 @@ export function CourseDetailPage() {
     </Container>
   );
 }
+
+export default CourseDetailPage;

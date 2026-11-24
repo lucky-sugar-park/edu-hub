@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "vitest run"
+    "dev": "vite",
+    "test": "vitest run",
+    "build:deploy": "tsc --noEmit && vite build --mode deploy"
   },
   "dependencies": {
     "@eduhub/api-client": "^0.0.0",
@@ -18,6 +19,7 @@
     "react-router-dom": "^7.18.5"
   },
   "devDependencies": {
+    "@module-federation/vite": "1.23.11",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",

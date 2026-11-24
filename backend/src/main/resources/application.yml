@@ -20,3 +20,6 @@ eduhub:
     jwt-secret: ${EDUHUB_JWT_SECRET:}
     token-ttl: 8h
     dev-login-enabled: false
+  # 화면 파일 폴더 (jar 밖). 기본은 프로젝트 루트의 run/web (backend 폴더에서 실행할 때 ../run/web).
+  # 다른 곳을 쓰려면 환경 변수 EDUHUB_WEB_ROOT, 화면 서비스를 끄려면 EDUHUB_WEB_ROOT를 빈 값으로
+  web-root: ${EDUHUB_WEB_ROOT:../run/web}

@@ -39,6 +39,10 @@ public class SecurityConfig {
         .authorizeHttpRequests(auth ->
             auth.requestMatchers(HttpMethod.POST, "/api/v1/dev/login")
                 .permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/login")
+                .permitAll()
+                .requestMatchers(r -> !r.getRequestURI().startsWith("/api/"))
+                .permitAll()
                 // 주의: 이 경로 아래에 개인정보를 반환하는 GET을 만들면 공개된다. 그때는 규칙을 좁힐 것.
                 .requestMatchers(
                     HttpMethod.GET, "/api/health", "/api/v1/courses", "/api/v1/courses/**")
