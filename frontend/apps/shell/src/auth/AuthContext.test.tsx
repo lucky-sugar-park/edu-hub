@@ -19,7 +19,7 @@ function Probe() {
       <span data-testid="state">
         {auth.token ? `${auth.employeeId}|${auth.roles.join(",")}|${auth.isAdmin}` : "anonymous"}
       </span>
-      <button type="button" onClick={() => void auth.login("E2002")}>
+      <button type="button" onClick={() => void auth.login("E2002", "pw-value")}>
         로그인
       </button>
       <button type="button" onClick={auth.logout}>
@@ -34,10 +34,8 @@ beforeEach(() => {
   login.mockResolvedValue({
     data: {
       accessToken: "jwt-value",
-      tokenType: "Bearer",
-      expiresAt: "2099-01-01T00:00:00Z",
-      employeeId: "E2002",
-      roles: ["EMPLOYEE", "ADMIN"],
+      expiresIn: 3600,
+      user: { id: 7, employeeNo: "E2002", role: "ADMIN" },
     },
   } as Awaited<ReturnType<typeof authApi.login>>);
 });
@@ -48,14 +46,46 @@ it("로그인하면 상태와 저장소에 담긴다", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: "로그인" }));
 
-  await waitFor(() =>
-    expect(screen.getByTestId("state")).toHaveTextContent("E2002|EMPLOYEE,ADMIN|true"),
-  );
-  expect(login).toHaveBeenCalledWith({ employeeId: "E2002" });
-  expect(JSON.parse(sessionStorage.getItem("eduhub.auth") ?? "{}")).toMatchObject({
+  await waitFor(() => expect(screen.getByTestId("state")).toHaveTextContent("E2002|ADMIN|true"));
+  expect(login).toHaveBeenCalledWith({ employeeNo: "E2002", password: "pw-value" });
+  const stored = sessionStorage.getItem("eduhub.auth") ?? "{}";
+  expect(JSON.parse(stored)).toMatchObject({
     token: "jwt-value",
     employeeId: "E2002",
+    roles: ["ADMIN"],
   });
+  // 비밀번호는 저장하지 않는다.
+  expect(stored).not.toContain("pw-value");
+});
+
+it("만료 시각은 요청 시각에 expiresIn(초)을 더한 값이다", async () => {
+  const before = Date.now();
+  renderWithProviders(<Probe />);
+
+  fireEvent.click(screen.getByRole("button", { name: "로그인" }));
+
+  await waitFor(() => expect(sessionStorage.getItem("eduhub.auth")).not.toBeNull());
+  const after = Date.now();
+  const expiresAt = Date.parse(JSON.parse(sessionStorage.getItem("eduhub.auth") ?? "{}").expiresAt);
+  expect(expiresAt).toBeGreaterThanOrEqual(before + 3600_000);
+  expect(expiresAt).toBeLessThanOrEqual(after + 3600_000);
+});
+
+it("사원 역할이면 관리자가 아니다", async () => {
+  login.mockResolvedValue({
+    data: {
+      accessToken: "jwt-2",
+      expiresIn: 3600,
+      user: { id: 8, employeeNo: "E2002", role: "EMPLOYEE" },
+    },
+  } as Awaited<ReturnType<typeof authApi.login>>);
+  renderWithProviders(<Probe />);
+
+  fireEvent.click(screen.getByRole("button", { name: "로그인" }));
+
+  await waitFor(() =>
+    expect(screen.getByTestId("state")).toHaveTextContent("E2002|EMPLOYEE|false"),
+  );
 });
 
 it("저장소에 있는 로그인 상태를 복원한다", () => {

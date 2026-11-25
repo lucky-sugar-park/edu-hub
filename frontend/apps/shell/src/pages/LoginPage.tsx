@@ -1,10 +1,8 @@
 import { Alert, Box, Button, Container, Paper, TextField, Typography } from "@mui/material";
 import { type FormEvent, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { DevLoginUnavailableError, useAuth } from "../auth/AuthContext";
+import { useAuth } from "../auth/AuthContext";
 import { toErrorMessage } from "@eduhub/api-client";
-
-const SSO_MESSAGE = "이 환경에서는 사내 SSO 연동 전까지 로그인할 수 없습니다";
 
 /** 돌아올 경로는 앱 안의 경로만 받는다(오픈 리다이렉트 방지). 백슬래시·제어문자·/login은 거부한다. */
 function safeFrom(state: unknown): string {
@@ -22,28 +20,34 @@ function safeFrom(state: unknown): string {
   return from;
 }
 
+/**
+ * 사번·비밀번호 로그인(D-33). 비밀번호는 입력란 상태에만 두고, 실패하면 비운다.
+ * 사번 없음과 비밀번호 틀림은 백엔드가 같은 401 메시지를 주므로 화면도 구분하지 않는다.
+ */
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [employeeId, setEmployeeId] = useState("");
+  const [employeeNo, setEmployeeNo] = useState("");
+  const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const id = employeeId.trim();
-    if (!id) {
-      setError("사번을 입력하세요.");
+    const id = employeeNo.trim();
+    if (!id || !password) {
+      setError(!id ? "사번을 입력하세요." : "비밀번호를 입력하세요.");
       return;
     }
     setSubmitting(true);
     setError(null);
     try {
-      await login(id);
+      await login(id, password);
       navigate(safeFrom(location.state), { replace: true });
     } catch (cause) {
-      setError(cause instanceof DevLoginUnavailableError ? SSO_MESSAGE : toErrorMessage(cause));
+      setPassword("");
+      setError(toErrorMessage(cause));
       setSubmitting(false);
     }
   }
@@ -54,9 +58,6 @@ export function LoginPage() {
         <Typography variant="h6" component="h1" gutterBottom>
           로그인
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          개발 환경 전용 로그인(비밀번호 없음)
-        </Typography>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
@@ -65,11 +66,21 @@ export function LoginPage() {
         <Box component="form" onSubmit={handleSubmit} noValidate>
           <TextField
             label="사번"
-            value={employeeId}
-            onChange={(event) => setEmployeeId(event.target.value)}
+            value={employeeNo}
+            onChange={(event) => setEmployeeNo(event.target.value)}
             fullWidth
             autoFocus
+            autoComplete="username"
             slotProps={{ htmlInput: { maxLength: 20 } }}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            label="비밀번호"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            fullWidth
+            autoComplete="current-password"
             sx={{ mb: 2 }}
           />
           <Button type="submit" variant="contained" fullWidth disabled={submitting}>

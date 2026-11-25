@@ -125,24 +125,39 @@ export interface HealthResponse {
     'status'?: string;
 }
 export interface LoginRequest {
-    'employeeId': string;
+    'employeeNo': string;
+    /**
+     * UTF-8 기준 72바이트 이하
+     */
+    'password': string;
 }
 export interface LoginResponse {
     /**
      * Bearer 토큰(HS256 JWT)
      */
     'accessToken': string;
-    'tokenType': string;
     /**
-     * 토큰 만료 시각
+     * 토큰 유효 시간(초)
      */
-    'expiresAt': string;
-    'employeeId': string;
-    /**
-     * EMPLOYEE 또는 EMPLOYEE, ADMIN
-     */
-    'roles': Array<string>;
+    'expiresIn': number;
+    'user': MeResponse;
 }
+export interface MeResponse {
+    /**
+     * 사원 ID
+     */
+    'id': number;
+    'employeeNo': string;
+    'role': MeResponseRoleEnum;
+}
+
+export const MeResponseRoleEnum = {
+    Employee: 'EMPLOYEE',
+    Admin: 'ADMIN',
+} as const;
+
+export type MeResponseRoleEnum = typeof MeResponseRoleEnum[keyof typeof MeResponseRoleEnum];
+
 export interface MyEnrollmentResponse {
     'id'?: number;
     'courseId'?: number;
@@ -225,6 +240,108 @@ export interface WaitingEntry {
     'waitingNumber'?: number;
     'appliedAt'?: string;
 }
+
+/**
+ * AuthApi - axios parameter creator
+ */
+export const AuthApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 성공하면 Bearer 토큰을 발급한다. 사번이 없거나 비밀번호가 틀리면 같은 401로 응답한다
+         * @summary 사번과 비밀번호로 로그인
+         * @param {LoginRequest} loginRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        login: async (loginRequest: LoginRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'loginRequest' is not null or undefined
+            assertParamExists('login', 'loginRequest', loginRequest)
+            const localVarPath = `/api/auth/login`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(loginRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * AuthApi - functional programming interface
+ */
+export const AuthApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = AuthApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 성공하면 Bearer 토큰을 발급한다. 사번이 없거나 비밀번호가 틀리면 같은 401로 응답한다
+         * @summary 사번과 비밀번호로 로그인
+         * @param {LoginRequest} loginRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async login(loginRequest: LoginRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.login(loginRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AuthApi.login']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * AuthApi - factory interface
+ */
+export const AuthApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = AuthApiFp(configuration)
+    return {
+        /**
+         * 성공하면 Bearer 토큰을 발급한다. 사번이 없거나 비밀번호가 틀리면 같은 401로 응답한다
+         * @summary 사번과 비밀번호로 로그인
+         * @param {LoginRequest} loginRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        login(loginRequest: LoginRequest, options?: RawAxiosRequestConfig): AxiosPromise<LoginResponse> {
+            return localVarFp.login(loginRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * AuthApi - object-oriented interface
+ */
+export class AuthApi extends BaseAPI {
+    /**
+     * 성공하면 Bearer 토큰을 발급한다. 사번이 없거나 비밀번호가 틀리면 같은 401로 응답한다
+     * @summary 사번과 비밀번호로 로그인
+     * @param {LoginRequest} loginRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public login(loginRequest: LoginRequest, options?: RawAxiosRequestConfig) {
+        return AuthApiFp(this.configuration).login(loginRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
 
 /**
  * CourseApi - axios parameter creator
@@ -911,108 +1028,6 @@ export class CourseAdminApi extends BaseAPI {
 
 
 /**
- * DevAuthApi - axios parameter creator
- */
-export const DevAuthApiAxiosParamCreator = function (configuration?: Configuration) {
-    return {
-        /**
-         * 개발 환경 전용, 비밀번호 없음. 관리자 사번 목록(EDUHUB_ADMIN_EMPLOYEE_IDS)에 있으면 roles에 ADMIN이 포함된다. 이 기능이 꺼진 환경에서는 404다
-         * @summary 개발용 로그인(사번으로 토큰 발급)
-         * @param {LoginRequest} loginRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        login: async (loginRequest: LoginRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'loginRequest' is not null or undefined
-            assertParamExists('login', 'loginRequest', loginRequest)
-            const localVarPath = `/api/v1/dev/login`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-            localVarHeaderParameter['Accept'] = '*/*';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(loginRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-    }
-};
-
-/**
- * DevAuthApi - functional programming interface
- */
-export const DevAuthApiFp = function(configuration?: Configuration) {
-    const localVarAxiosParamCreator = DevAuthApiAxiosParamCreator(configuration)
-    return {
-        /**
-         * 개발 환경 전용, 비밀번호 없음. 관리자 사번 목록(EDUHUB_ADMIN_EMPLOYEE_IDS)에 있으면 roles에 ADMIN이 포함된다. 이 기능이 꺼진 환경에서는 404다
-         * @summary 개발용 로그인(사번으로 토큰 발급)
-         * @param {LoginRequest} loginRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async login(loginRequest: LoginRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.login(loginRequest, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DevAuthApi.login']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-    }
-};
-
-/**
- * DevAuthApi - factory interface
- */
-export const DevAuthApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
-    const localVarFp = DevAuthApiFp(configuration)
-    return {
-        /**
-         * 개발 환경 전용, 비밀번호 없음. 관리자 사번 목록(EDUHUB_ADMIN_EMPLOYEE_IDS)에 있으면 roles에 ADMIN이 포함된다. 이 기능이 꺼진 환경에서는 404다
-         * @summary 개발용 로그인(사번으로 토큰 발급)
-         * @param {LoginRequest} loginRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        login(loginRequest: LoginRequest, options?: RawAxiosRequestConfig): AxiosPromise<LoginResponse> {
-            return localVarFp.login(loginRequest, options).then((request) => request(axios, basePath));
-        },
-    };
-};
-
-/**
- * DevAuthApi - object-oriented interface
- */
-export class DevAuthApi extends BaseAPI {
-    /**
-     * 개발 환경 전용, 비밀번호 없음. 관리자 사번 목록(EDUHUB_ADMIN_EMPLOYEE_IDS)에 있으면 roles에 ADMIN이 포함된다. 이 기능이 꺼진 환경에서는 404다
-     * @summary 개발용 로그인(사번으로 토큰 발급)
-     * @param {LoginRequest} loginRequest 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    public login(loginRequest: LoginRequest, options?: RawAxiosRequestConfig) {
-        return DevAuthApiFp(this.configuration).login(loginRequest, options).then((request) => request(this.axios, this.basePath));
-    }
-}
-
-
-
-/**
  * EnrollmentApi - axios parameter creator
  */
 export const EnrollmentApiAxiosParamCreator = function (configuration?: Configuration) {
@@ -1631,6 +1646,104 @@ export class HealthApi extends BaseAPI {
      */
     public health(options?: RawAxiosRequestConfig) {
         return HealthApiFp(this.configuration).health(options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * MeApi - axios parameter creator
+ */
+export const MeApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 토큰의 클레임만으로 응답한다(DB 조회 없음). 계정이 지워져도 토큰 만료까지는 응답한다
+         * @summary 현재 로그인한 사용자
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        me: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/me`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * MeApi - functional programming interface
+ */
+export const MeApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = MeApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 토큰의 클레임만으로 응답한다(DB 조회 없음). 계정이 지워져도 토큰 만료까지는 응답한다
+         * @summary 현재 로그인한 사용자
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async me(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MeResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.me(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MeApi.me']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * MeApi - factory interface
+ */
+export const MeApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = MeApiFp(configuration)
+    return {
+        /**
+         * 토큰의 클레임만으로 응답한다(DB 조회 없음). 계정이 지워져도 토큰 만료까지는 응답한다
+         * @summary 현재 로그인한 사용자
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        me(options?: RawAxiosRequestConfig): AxiosPromise<MeResponse> {
+            return localVarFp.me(options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * MeApi - object-oriented interface
+ */
+export class MeApi extends BaseAPI {
+    /**
+     * 토큰의 클레임만으로 응답한다(DB 조회 없음). 계정이 지워져도 토큰 만료까지는 응답한다
+     * @summary 현재 로그인한 사용자
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public me(options?: RawAxiosRequestConfig) {
+        return MeApiFp(this.configuration).me(options).then((request) => request(this.axios, this.basePath));
     }
 }
 

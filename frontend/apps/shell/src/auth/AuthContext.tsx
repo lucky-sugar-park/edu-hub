@@ -12,7 +12,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   authApi,
   clearAuth,
-  isAxiosError,
   isExpired,
   loadAuth,
   type StoredAuth,
@@ -26,17 +25,12 @@ export interface AuthContextValue {
   roles: string[];
   expiresAt: string | null;
   isAdmin: boolean;
-  /** 사번으로 dev 로그인한다. 실패하면 예외를 그대로 던진다(화면이 메시지로 바꾼다). */
-  login: (employeeId: string) => Promise<void>;
+  /**
+   * 사번·비밀번호로 로그인한다(D-33). 실패하면 예외를 그대로 던진다(화면이 메시지로 바꾼다).
+   * 비밀번호는 요청에만 쓰고 어디에도 저장하지 않는다.
+   */
+  login: (employeeNo: string, password: string) => Promise<void>;
   logout: () => void;
-}
-
-/** dev 로그인 API가 없는 환경(404, 예: 운영)이다. 화면은 이 에러만 보고 SSO 안내를 띄운다. */
-export class DevLoginUnavailableError extends Error {
-  constructor() {
-    super("dev login is unavailable");
-    this.name = "DevLoginUnavailableError";
-  }
 }
 
 const NO_HOOKS = { getToken: () => null, clearToken: () => {}, onUnauthorized: () => {} };
@@ -66,20 +60,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuth(null);
   }, []);
 
-  const login = useCallback(async (employeeId: string) => {
-    let data: Awaited<ReturnType<typeof authApi.login>>["data"];
-    try {
-      data = (await authApi.login({ employeeId })).data;
-    } catch (cause) {
-      if (isAxiosError(cause) && cause.response?.status === 404)
-        throw new DevLoginUnavailableError();
-      throw cause;
-    }
+  const login = useCallback(async (employeeNo: string, password: string) => {
+    const requestedAt = Date.now();
+    const { data } = await authApi.login({ employeeNo, password });
+    // 응답의 만료는 초 단위 길이다. 요청을 보낸 시각을 기준으로 잡아, 응답이 늦어도 실제 만료보다 늦게 잡지 않는다.
     const next: StoredAuth = {
       token: data.accessToken,
-      employeeId: data.employeeId,
-      roles: data.roles,
-      expiresAt: data.expiresAt,
+      employeeId: data.user.employeeNo,
+      roles: [data.user.role],
+      expiresAt: new Date(requestedAt + data.expiresIn * 1000).toISOString(),
     };
     saveAuth(next);
     authRef.current = next;

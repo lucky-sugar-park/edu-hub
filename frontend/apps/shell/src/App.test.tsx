@@ -43,13 +43,13 @@ const admin = () => fakeAuth(["EMPLOYEE", "ADMIN"], "E9001");
 it("비로그인으로 /me/enrollments를 열면 로그인 화면으로 보낸다", () => {
   renderWithProviders(<App />, { route: "/me/enrollments" });
 
-  expect(screen.getByText("개발 환경 전용 로그인(비밀번호 없음)")).toBeInTheDocument();
+  expect(screen.getByLabelText("비밀번호")).toBeInTheDocument();
 });
 
 it("비로그인으로 /admin을 열면 로그인 화면으로 보낸다", () => {
   renderWithProviders(<App />, { route: "/admin" });
 
-  expect(screen.getByText("개발 환경 전용 로그인(비밀번호 없음)")).toBeInTheDocument();
+  expect(screen.getByLabelText("비밀번호")).toBeInTheDocument();
   expect(screen.queryByText("과정 관리 화면")).not.toBeInTheDocument();
 });
 
@@ -121,7 +121,7 @@ it("관리자는 명단 경로를 볼 수 있다", async () => {
 it("비로그인으로 명단 경로를 열면 로그인 화면으로 보낸다", () => {
   renderWithProviders(<App />, { route: "/admin/sessions/10/roster" });
 
-  expect(screen.getByText("개발 환경 전용 로그인(비밀번호 없음)")).toBeInTheDocument();
+  expect(screen.getByLabelText("비밀번호")).toBeInTheDocument();
 });
 
 it("과정 상세(/courses/:courseId)의 회차 행에 신청 버튼을 끼운다", async () => {
