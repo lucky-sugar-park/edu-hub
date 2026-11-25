@@ -19,6 +19,20 @@
       "runtimeExecutable": "cmd",
       "runtimeArgs": ["/c", "cd frontend\\apps\\shell && set API_PROXY_TARGET=http://localhost:8088&& npx vite --port 3003 --strictPort"],
       "port": 3003
+    },
+    {
+      "name": "course-mfe",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "-w", "apps/course-mfe"],
+      "cwd": "frontend",
+      "port": 3001
+    },
+    {
+      "name": "enrollment-mfe",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "-w", "apps/enrollment-mfe"],
+      "cwd": "frontend",
+      "port": 3002
     }
   ]
 }

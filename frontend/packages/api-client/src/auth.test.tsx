@@ -154,7 +154,7 @@ it("로그인 요청의 401은 토큰을 지우거나 이동하지 않는다", a
   renderWithProviders(<Where />, { auth: fakeAuth(), route: "/admin" });
   statuses = [401];
 
-  await expect(httpClient.post("/api/v1/dev/login", {})).rejects.toBeTruthy();
+  await expect(httpClient.post("/api/auth/login", {})).rejects.toBeTruthy();
 
   expect(screen.getByTestId("where")).toHaveTextContent("/admin|null");
   expect(stored()).not.toBeNull();
@@ -164,7 +164,7 @@ it("로그인 요청의 401은 토큰을 지우거나 이동하지 않는다", a
 it("로그인 요청에는 기존 토큰을 붙이지 않는다", async () => {
   renderWithProviders(<Where />, { auth: fakeAuth() });
 
-  await httpClient.post("/api/v1/dev/login", {});
+  await httpClient.post("/api/auth/login", {});
 
   expect(calls[0].authorization).toBeNull();
 });

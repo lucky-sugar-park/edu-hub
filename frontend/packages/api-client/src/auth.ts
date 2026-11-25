@@ -7,12 +7,15 @@ import { Configuration } from "./generated";
  */
 
 // ---- 로그인 상태 보관(sessionStorage, NFR-03). 저장소를 쓸 수 없으면 조용히 건너뛴다. ----
+// 비밀번호는 저장하지 않는다. 로그인 응답의 토큰·사번·역할·만료 시각만 둔다.
 
 const KEY = "eduhub.auth";
 
 export interface StoredAuth {
   token: string;
+  /** 사번(로그인 응답의 user.employeeNo). */
   employeeId: string;
+  /** 역할 목록. 백엔드는 역할 하나(user.role)를 주므로 [role]로 담는다. */
   roles: string[];
   /** ISO-8601 UTC 시각 */
   expiresAt: string;
@@ -88,7 +91,8 @@ export function setAuthHooks(next: AuthHooks): void {
   hooks = next;
 }
 
-const LOGIN_PATH = "/api/v1/dev/login";
+/** 로그인 요청에는 토큰을 붙이지 않는다. 만료 토큰이 붙으면 백엔드가 로그인 자체를 401로 막는다(D-33). */
+const LOGIN_PATH = "/api/auth/login";
 
 /** 로그인하지 않아도 보는 공개 GET 경로(백엔드 SecurityConfig와 같은 범위). */
 function isPublicGet(config: InternalAxiosRequestConfig): boolean {
