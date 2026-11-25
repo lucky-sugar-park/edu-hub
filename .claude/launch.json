@@ -11,7 +11,7 @@
     {
       "name": "backend-8088",
       "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "backend\\gradlew.bat", "-p", "backend", "bootRun", "--args=--spring.profiles.active=dev --server.port=8088 --eduhub.admin.employee-ids=ADMIN01"],
+      "runtimeArgs": ["/c", "backend\\gradlew.bat", "-p", "backend", "bootRun", "--args=--spring.profiles.active=dev --server.port=8088"],
       "port": 8088
     },
     {

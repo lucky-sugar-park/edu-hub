@@ -1,6 +1,6 @@
 package com.example.eduhub.enrollment;
 
-import com.example.eduhub.common.CurrentEmployee;
+import com.example.eduhub.auth.CurrentUser;
 import com.example.eduhub.common.ErrorResponse;
 import com.example.eduhub.common.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +14,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -74,8 +76,8 @@ public class EnrollmentController {
   @PostMapping("/api/v1/sessions/{sessionId}/enrollments")
   @ResponseStatus(HttpStatus.CREATED)
   public EnrollmentResponse enroll(
-      @PathVariable Long sessionId, @Parameter(hidden = true) @CurrentEmployee String employeeId) {
-    return enrollmentCommandService.enroll(sessionId, employeeId);
+      @PathVariable Long sessionId, @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt) {
+    return enrollmentCommandService.enroll(sessionId, CurrentUser.from(jwt).employeeNo());
   }
 
   @Operation(
@@ -92,8 +94,8 @@ public class EnrollmentController {
       content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   @GetMapping("/api/v1/sessions/{sessionId}/enrollments/me")
   public EnrollmentResponse getMyEnrollment(
-      @PathVariable Long sessionId, @Parameter(hidden = true) @CurrentEmployee String employeeId) {
-    return enrollmentQueryService.getMyEnrollment(sessionId, employeeId);
+      @PathVariable Long sessionId, @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt) {
+    return enrollmentQueryService.getMyEnrollment(sessionId, CurrentUser.from(jwt).employeeNo());
   }
 
   @Operation(summary = "회차의 내 신청을 취소한다", description = "교육 시작 전까지만. 확정자가 취소하면 대기 1순위가 확정된다")
@@ -116,8 +118,8 @@ public class EnrollmentController {
       content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   @PostMapping("/api/v1/sessions/{sessionId}/enrollments/me/cancel")
   public EnrollmentResponse cancel(
-      @PathVariable Long sessionId, @Parameter(hidden = true) @CurrentEmployee String employeeId) {
-    return enrollmentCommandService.cancel(sessionId, employeeId);
+      @PathVariable Long sessionId, @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt) {
+    return enrollmentCommandService.cancel(sessionId, CurrentUser.from(jwt).employeeNo());
   }
 
   @Operation(
@@ -140,10 +142,11 @@ public class EnrollmentController {
       content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
   @GetMapping("/api/v1/me/enrollments")
   public PageResponse<MyEnrollmentResponse> getMyEnrollments(
-      @Parameter(hidden = true) @CurrentEmployee String employeeId,
+      @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "신청 상태. 생략하면 전체") @RequestParam(required = false)
           EnrollmentStatus status,
       @Parameter(hidden = true) @PageableDefault(size = 20) Pageable pageable) {
-    return enrollmentQueryService.getMyEnrollments(employeeId, status, pageable);
+    return enrollmentQueryService.getMyEnrollments(
+        CurrentUser.from(jwt).employeeNo(), status, pageable);
   }
 }

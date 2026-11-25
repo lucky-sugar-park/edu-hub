@@ -1,4 +1,4 @@
-package com.example.eduhub.common;
+package com.example.eduhub.auth;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
@@ -14,8 +14,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
  * {@code @WebMvcTest} 슬라이스용 보안 설정. 실제 {@link SecurityConfig}(규칙표, 401·403 응답)를 가져오고, 서명 키 없이 쓰도록 모든
  * 토큰 문자열을 거부하는 디코더를 둔다. 인증은 {@link #employee}·{@link #admin}의 {@code jwt()} 후처리기로 만든다.
  *
- * <p>슬라이스에는 {@code @ActiveProfiles("test")}를 붙이지 않는다(붙이면 dev 로그인 컨트롤러 조건이 참이 되어 {@code
- * TokenIssuer}가 필요하다).
+ * <p>슬라이스에는 {@code @ActiveProfiles("test")}를 붙이지 않는다(붙이면 시더·무작위 키 설정이 켜져 슬라이스에 없는 빈이 필요해진다).
  */
 @TestConfiguration
 @Import(SecurityConfig.class)
@@ -28,18 +27,17 @@ public class WebMvcSecurityTestConfig {
     };
   }
 
-  /** 사번이 {@code employeeId}인 일반 사원(ROLE_EMPLOYEE). */
-  public static JwtRequestPostProcessor employee(String employeeId) {
+  /** 사번이 {@code employeeNo}인 일반 사원(사원 ID 1, role EMPLOYEE, 권한 ROLE_EMPLOYEE). */
+  public static JwtRequestPostProcessor employee(String employeeNo) {
     return jwt()
-        .jwt(j -> j.subject(employeeId))
+        .jwt(j -> j.subject("1").claim("employee_no", employeeNo).claim("role", "EMPLOYEE"))
         .authorities(new SimpleGrantedAuthority("ROLE_EMPLOYEE"));
   }
 
-  /** 관리자(ROLE_EMPLOYEE, ROLE_ADMIN). */
-  public static JwtRequestPostProcessor admin(String employeeId) {
+  /** 사번이 {@code employeeNo}인 관리자(사원 ID 2, role ADMIN, 권한 ROLE_ADMIN). */
+  public static JwtRequestPostProcessor admin(String employeeNo) {
     return jwt()
-        .jwt(j -> j.subject(employeeId))
-        .authorities(
-            new SimpleGrantedAuthority("ROLE_EMPLOYEE"), new SimpleGrantedAuthority("ROLE_ADMIN"));
+        .jwt(j -> j.subject("2").claim("employee_no", employeeNo).claim("role", "ADMIN"))
+        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
   }
 }

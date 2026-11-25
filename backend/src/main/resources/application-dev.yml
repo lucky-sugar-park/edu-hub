@@ -8,8 +8,8 @@ spring:
 
 eduhub:
   auth:
-    # 개발 환경 전용 로그인(비밀번호 없음). 운영 프로필에서는 켜지 않는다
-    dev-login-enabled: true
+    # 키가 없으면 무작위 키로 기동한다(개발용). 운영 프로필에서는 켜지 않는다
+    allow-random-key: true
 
 logging:
   level:

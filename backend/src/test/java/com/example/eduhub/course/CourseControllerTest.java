@@ -10,8 +10,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.eduhub.auth.WebMvcSecurityTestConfig;
 import com.example.eduhub.common.PageResponse;
-import com.example.eduhub.common.WebMvcSecurityTestConfig;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;

@@ -252,6 +252,21 @@ class OpenApiDocsTest {
   }
 
   @Test
+  void apiDocsIncludePasswordLoginEndpoint() throws Exception {
+    String path = "$.paths['/api/auth/login'].post";
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(path + ".tags[0]").value("Auth"))
+        .andExpect(jsonPath(path + ".summary").exists())
+        .andExpect(jsonPath(path + ".responses['200']").exists())
+        .andExpect(jsonPath(path + ".responses['400']").exists())
+        .andExpect(jsonPath(path + ".responses['401']").exists())
+        .andExpect(jsonPath(path + ".security").doesNotExist())
+        .andExpect(jsonPath("$.components.schemas.LoginResponse.required").isArray());
+  }
+
+  @Test
   void publicApisHaveNoSecurityRequirement() throws Exception {
     mockMvc
         .perform(get("/v3/api-docs"))

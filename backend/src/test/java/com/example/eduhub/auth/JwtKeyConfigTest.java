@@ -1,33 +1,38 @@
-package com.example.eduhub.common;
+package com.example.eduhub.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Base64;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
-/** 키 처리 규칙(설계 2절)과 dev 로그인 노출 조건. 설계 8.1의 A7·A8. */
+/** 키 처리 규칙(설계 5절)과 무작위 키 허용 조건. 설계 8절의 A13. */
 class JwtKeyConfigTest {
 
   private final ApplicationContextRunner runner =
       new ApplicationContextRunner()
-          .withUserConfiguration(
-              TestBeans.class, JwtKeyConfig.class, TokenIssuer.class, DevAuthController.class);
+          .withUserConfiguration(TestBeans.class, JwtKeyConfig.class, TokenIssuer.class);
 
   @Configuration
-  @EnableConfigurationProperties(AdminProperties.class)
   static class TestBeans {
     @Bean
     Clock clock() {
       return Clock.systemUTC();
     }
+  }
+
+  private static Employee employee(long id, String no) {
+    Employee employee = new Employee(no, "{bcrypt}x", EmployeeRole.EMPLOYEE, Instant.now());
+    ReflectionTestUtils.setField(employee, "id", id);
+    return employee;
   }
 
   private static String randomKey(int bytes) {
@@ -36,40 +41,21 @@ class JwtKeyConfigTest {
     return Base64.getEncoder().encodeToString(raw);
   }
 
-  // A7
+  // A13
   @Test
-  void devAuthControllerIsAbsentWhenDevLoginIsOff() {
+  void emptyKeyFailsStartupWhenRandomKeyIsNotAllowed() {
     runner
-        .withPropertyValues("eduhub.auth.jwt-secret=" + randomKey(32))
-        .run(context -> {
-          assertThat(context).hasNotFailed();
-          assertThat(context).doesNotHaveBean(DevAuthController.class);
-        });
-  }
-
-  @Test
-  void devAuthControllerExistsWhenDevLoginIsOn() {
-    runner
-        .withPropertyValues(
-            "eduhub.auth.jwt-secret=" + randomKey(32), "eduhub.auth.dev-login-enabled=true")
-        .run(context -> assertThat(context).hasSingleBean(DevAuthController.class));
-  }
-
-  // A8
-  @Test
-  void emptyKeyFailsStartupWhenDevLoginIsOff() {
-    runner
-        .withPropertyValues("eduhub.auth.jwt-secret=", "eduhub.auth.dev-login-enabled=false")
+        .withPropertyValues("eduhub.auth.jwt-secret=", "eduhub.auth.allow-random-key=false")
         .run(context -> assertThat(context).hasFailed());
   }
 
-  // A8
+  // A13
   @Test
-  void missingKeyFailsStartupWhenDevLoginIsOff() {
+  void missingKeyFailsStartupWhenRandomKeyIsNotAllowed() {
     runner.run(context -> assertThat(context).hasFailed());
   }
 
-  // A8
+  // A13
   @Test
   void shortKeyFailsStartupAndDoesNotLeakKey() {
     String shortKey = randomKey(16);
@@ -82,10 +68,10 @@ class JwtKeyConfigTest {
   }
 
   @Test
-  void shortKeyFailsEvenWhenDevLoginIsOn() {
+  void shortKeyFailsEvenWhenRandomKeyIsAllowed() {
     runner
         .withPropertyValues(
-            "eduhub.auth.jwt-secret=" + randomKey(16), "eduhub.auth.dev-login-enabled=true")
+            "eduhub.auth.jwt-secret=" + randomKey(16), "eduhub.auth.allow-random-key=true")
         .run(context -> assertThat(context).hasFailed());
   }
 
@@ -100,18 +86,18 @@ class JwtKeyConfigTest {
         });
   }
 
-  // A8
+  // A13
   @Test
-  void emptyKeyStartsWithRandomKeyWhenDevLoginIsOn() {
+  void emptyKeyStartsWithRandomKeyWhenRandomKeyIsAllowed() {
     runner
-        .withPropertyValues("eduhub.auth.jwt-secret=", "eduhub.auth.dev-login-enabled=true")
+        .withPropertyValues("eduhub.auth.jwt-secret=", "eduhub.auth.allow-random-key=true")
         .run(context -> {
           assertThat(context).hasNotFailed();
           assertThat(context).hasSingleBean(JwtDecoder.class);
           assertThat(context).hasSingleBean(JwtEncoder.class);
           // 만든 키로 발급한 토큰을 같은 컨텍스트의 디코더가 검증한다.
-          String token = context.getBean(TokenIssuer.class).issue("E1").accessToken();
-          assertThat(context.getBean(JwtDecoder.class).decode(token).getSubject()).isEqualTo("E1");
+          String token = context.getBean(TokenIssuer.class).issue(employee(1L, "E1")).token();
+          assertThat(context.getBean(JwtDecoder.class).decode(token).getSubject()).isEqualTo("1");
         });
   }
 
@@ -121,8 +107,8 @@ class JwtKeyConfigTest {
         .withPropertyValues("eduhub.auth.jwt-secret=" + randomKey(32))
         .run(context -> {
           assertThat(context).hasNotFailed();
-          String token = context.getBean(TokenIssuer.class).issue("E2").accessToken();
-          assertThat(context.getBean(JwtDecoder.class).decode(token).getSubject()).isEqualTo("E2");
+          String token = context.getBean(TokenIssuer.class).issue(employee(2L, "E2")).token();
+          assertThat(context.getBean(JwtDecoder.class).decode(token).getSubject()).isEqualTo("2");
         });
   }
 

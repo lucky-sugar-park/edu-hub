@@ -1,4 +1,4 @@
-package com.example.eduhub.common;
+package com.example.eduhub.auth;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import java.security.SecureRandom;
@@ -19,8 +19,8 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 /**
  * JWT 서명 키와 인코더·디코더(HS256, D-30).
  *
- * <p>키는 Base64 디코드 결과가 32바이트 이상이어야 한다. 비어 있으면 dev 로그인이 켜진 프로필에서만 무작위 키를 만들고(재시작하면 기존 토큰 무효), 그 밖에는
- * 기동을 실패시킨다. 키 값은 로그와 예외 메시지에 쓰지 않는다.
+ * <p>키는 Base64 디코드 결과가 32바이트 이상이어야 한다. 비어 있으면 무작위 키가 허용된 프로필(dev·test)에서만 무작위 키를 만들고(재시작하면 기존 토큰
+ * 무효), 그 밖에는 기동을 실패시킨다. 키 값은 로그와 예외 메시지에 쓰지 않는다.
  */
 @Configuration
 @EnableConfigurationProperties(AuthProperties.class)
@@ -34,9 +34,9 @@ public class JwtKeyConfig {
     String secret = properties.jwtSecret();
     byte[] bytes;
     if (secret == null || secret.isBlank()) {
-      if (!properties.devLoginEnabled()) {
+      if (!properties.allowRandomKey()) {
         throw new IllegalStateException(
-            "eduhub.auth.jwt-secret(EDUHUB_JWT_SECRET)이 비어 있습니다. dev 로그인이 꺼진 환경에서는 Base64 인코딩 "
+            "eduhub.auth.jwt-secret(EDUHUB_JWT_SECRET)이 비어 있습니다. 무작위 키가 허용되지 않은 환경에서는 Base64 인코딩 "
                 + MIN_KEY_BYTES
                 + "바이트 이상의 키가 필요합니다");
       }
