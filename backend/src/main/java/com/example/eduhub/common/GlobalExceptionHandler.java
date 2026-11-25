@@ -1,5 +1,6 @@
 package com.example.eduhub.common;
 
+import com.example.eduhub.auth.InvalidCredentialsException;
 import java.util.Comparator;
 import java.util.stream.Collectors;
 import org.springframework.dao.PessimisticLockingFailureException;
@@ -33,6 +34,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   public ResponseEntity<ErrorResponse> handleInvalidRequest(InvalidRequestException exception) {
     return ResponseEntity.badRequest()
         .body(new ErrorResponse(HttpStatus.BAD_REQUEST.name(), exception.getMessage()));
+  }
+
+  /** 사번 없음과 비밀번호 틀림은 같은 본문으로 응답한다(D-33). */
+  @ExceptionHandler(InvalidCredentialsException.class)
+  public ResponseEntity<ErrorResponse> handleInvalidCredentials(
+      InvalidCredentialsException exception) {
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+        .body(new ErrorResponse("UNAUTHORIZED", exception.getMessage()));
   }
 
   /** 회차 락을 기다리다 시간이 지났다. 재시도할 수 있다. */

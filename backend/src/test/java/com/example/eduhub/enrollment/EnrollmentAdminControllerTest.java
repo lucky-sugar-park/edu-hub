@@ -1,7 +1,7 @@
 package com.example.eduhub.enrollment;
 
-import static com.example.eduhub.common.WebMvcSecurityTestConfig.admin;
-import static com.example.eduhub.common.WebMvcSecurityTestConfig.employee;
+import static com.example.eduhub.auth.WebMvcSecurityTestConfig.admin;
+import static com.example.eduhub.auth.WebMvcSecurityTestConfig.employee;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
@@ -12,8 +12,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.eduhub.auth.WebMvcSecurityTestConfig;
 import com.example.eduhub.common.ConflictException;
-import com.example.eduhub.common.WebMvcSecurityTestConfig;
 import com.example.eduhub.course.CourseSessionStatus;
 import com.example.eduhub.course.SessionNotFoundException;
 import java.time.Instant;

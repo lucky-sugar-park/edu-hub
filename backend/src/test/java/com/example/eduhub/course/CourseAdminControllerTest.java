@@ -1,6 +1,6 @@
 package com.example.eduhub.course;
 
-import static com.example.eduhub.common.WebMvcSecurityTestConfig.employee;
+import static com.example.eduhub.auth.WebMvcSecurityTestConfig.employee;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -11,9 +11,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.eduhub.auth.WebMvcSecurityTestConfig;
 import com.example.eduhub.common.ConflictException;
 import com.example.eduhub.common.InvalidRequestException;
-import com.example.eduhub.common.WebMvcSecurityTestConfig;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;

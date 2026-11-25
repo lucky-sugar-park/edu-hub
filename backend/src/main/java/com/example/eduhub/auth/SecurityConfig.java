@@ -1,5 +1,6 @@
-package com.example.eduhub.common;
+package com.example.eduhub.auth;
 
+import com.example.eduhub.common.ErrorResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import org.springframework.context.annotation.Bean;
@@ -18,7 +19,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 
 /**
- * 보안 필터 체인(D-30). 무상태 Bearer JWT 리소스 서버이며, 401·403도 {@link ErrorResponse} JSON으로 응답한다.
+ * 보안 필터 체인(D-33). 무상태 Bearer JWT 리소스 서버이며, 401·403도 {@link ErrorResponse} JSON으로 응답한다.
  *
  * <p>규칙은 위에서부터 적용되므로 좁은 규칙을 앞에 둔다.
  */
@@ -37,11 +38,7 @@ public class SecurityConfig {
         .logout(AbstractHttpConfigurer::disable)
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth ->
-            auth.requestMatchers(HttpMethod.POST, "/api/v1/dev/login")
-                .permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/auth/login")
-                .permitAll()
-                .requestMatchers(r -> !r.getRequestURI().startsWith("/api/"))
+            auth.requestMatchers(HttpMethod.POST, "/api/auth/login")
                 .permitAll()
                 // 주의: 이 경로 아래에 개인정보를 반환하는 GET을 만들면 공개된다. 그때는 규칙을 좁힐 것.
                 .requestMatchers(
@@ -49,10 +46,14 @@ public class SecurityConfig {
                 .permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                 .permitAll()
-                .requestMatchers("/api/v1/admin/**")
+                // 과정 조회(GET) 외의 /api/v1/courses/** 는 관리자. 지금은 이런 API가 없지만 실수로 열리지 않게 막는다
+                .requestMatchers("/api/v1/courses", "/api/v1/courses/**")
+                .hasRole("ADMIN")
+                .requestMatchers("/api/admin/**", "/api/v1/admin/**")
                 .hasRole("ADMIN")
                 .requestMatchers("/api/**")
                 .authenticated()
+                // /api 밖: 화면 파일과 SPA 경로(FrontendResourceConfig)
                 .anyRequest()
                 .permitAll())
         .exceptionHandling(
@@ -64,11 +65,11 @@ public class SecurityConfig {
     return http.build();
   }
 
-  /** {@code roles} 클레임을 {@code ROLE_*} 권한으로 바꾸고, 주체 이름은 {@code sub}(사번)로 한다. */
+  /** {@code role} 클레임을 {@code ROLE_*} 권한으로 바꾸고, 주체 이름은 {@code sub}(사원 ID)로 한다. */
   @Bean
   public JwtAuthenticationConverter jwtAuthenticationConverter() {
     JwtGrantedAuthoritiesConverter authorities = new JwtGrantedAuthoritiesConverter();
-    authorities.setAuthoritiesClaimName("roles");
+    authorities.setAuthoritiesClaimName("role");
     authorities.setAuthorityPrefix("ROLE_");
     JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
     converter.setJwtGrantedAuthoritiesConverter(authorities);
